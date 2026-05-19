@@ -297,6 +297,9 @@ export interface Database {
           nanny_user_id: string | null
           starts_at: string
           ends_at: string
+          actual_ends_at: string | null
+          actual_notes: string | null
+          break_minutes: number
           notes: string | null
           status: ScheduleStatus
           created_at: string
@@ -309,6 +312,9 @@ export interface Database {
           nanny_user_id?: string | null
           starts_at: string
           ends_at: string
+          actual_ends_at?: string | null
+          actual_notes?: string | null
+          break_minutes?: number
           notes?: string | null
           status?: ScheduleStatus
           created_at?: string
@@ -320,6 +326,9 @@ export interface Database {
           nanny_user_id?: string
           starts_at?: string
           ends_at?: string
+          actual_ends_at?: string | null
+          actual_notes?: string | null
+          break_minutes?: number
           notes?: string | null
           status?: ScheduleStatus
           created_at?: string
@@ -649,6 +658,25 @@ export interface Database {
           p_weeks?: number
         }
         Returns: number
+      }
+      upsert_schedule_day: {
+        Args: {
+          p_household_id: string
+          p_household_nanny_id: string
+          p_work_date: string
+          p_starts_at: string
+          p_ends_at: string
+          p_notes?: string | null
+        }
+        Returns: string
+      }
+      report_shift_late: {
+        Args: {
+          p_schedule_block_id: string
+          p_actual_ends_at: string
+          p_notes?: string | null
+        }
+        Returns: string
       }
     }
     Enums: Record<string, never>

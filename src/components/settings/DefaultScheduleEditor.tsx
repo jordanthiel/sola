@@ -175,8 +175,8 @@ export function DefaultScheduleEditor({ householdNannyId }: DefaultScheduleEdito
       </div>
 
       <p className="text-xs text-[var(--color-muted-foreground)]">
-        The schedule page always shows this weekly pattern. Use &quot;Apply to calendar&quot; to create
-        concrete shifts, or add one-off changes on the Schedule page.
+        This is the usual week. On the Schedule page, change individual days when times differ, or let
+        your nanny note if they worked late.
       </p>
     </div>
   )

@@ -2,7 +2,6 @@ import { Link, NavLink, Outlet } from 'react-router-dom'
 import {
   Baby,
   Calendar,
-  Clock,
   Home,
   LogOut,
   Settings,
@@ -18,7 +17,6 @@ import { cn } from '@/lib/utils'
 const parentNav = [
   { to: '/', label: 'Dashboard', icon: Home },
   { to: '/schedule', label: 'Schedule', icon: Calendar },
-  { to: '/hours', label: 'Hours', icon: Clock },
   { to: '/payroll', label: 'Payroll', icon: Wallet },
   { to: '/time-off', label: 'Time off', icon: Palmtree },
   { to: '/children', label: 'Children', icon: Baby },
@@ -29,7 +27,6 @@ const parentNav = [
 const nannyNav = [
   { to: '/', label: 'Dashboard', icon: Home },
   { to: '/schedule', label: 'Schedule', icon: Calendar },
-  { to: '/hours', label: 'Hours', icon: Clock },
   { to: '/payroll', label: 'Payroll', icon: Wallet },
   { to: '/time-off', label: 'Time off', icon: Palmtree },
   { to: '/activities', label: 'Activities', icon: Sparkles },

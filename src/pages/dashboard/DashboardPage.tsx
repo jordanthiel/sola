@@ -1,32 +1,49 @@
+import { useMemo } from 'react'
 import { addDays, format, parseISO, startOfDay, startOfWeek } from 'date-fns'
 import { Link } from 'react-router-dom'
 import { useHousehold } from '@/contexts/HouseholdContext'
 import {
-  useActiveClockEntry,
   useChildActivities,
+  useMyHouseholdNanny,
   usePendingTimeOff,
   useScheduleBlocks,
-  useTimeEntries,
+  useScheduleTemplates,
 } from '@/hooks/useHouseholdData'
+import { payableShiftsInPeriod, payableShiftMinutes } from '@/lib/schedule-hours'
+import type { NannyScheduleTemplate } from '@/types/schedule-template'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { formatHours } from '@/lib/utils'
-import { entryWorkedMinutes } from '@/lib/payroll'
+import { blockHasLateReport, effectiveEndIso } from '@/lib/schedule-hours'
+
+const scheduleFrom = startOfDay(new Date()).toISOString()
+const scheduleTo = addDays(startOfDay(new Date()), 14).toISOString()
+
 export function DashboardPage() {
-  const { isParent, isNanny, activeHousehold } = useHousehold()
+  const { isParent, activeHousehold } = useHousehold()
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 })
   const weekEnd = addDays(weekStart, 7)
+  const { data: myNanny } = useMyHouseholdNanny()
 
-  const scheduleTo = addDays(startOfDay(new Date()), 14).toISOString()
-  const scheduleFrom = startOfDay(new Date()).toISOString()
   const { data: upcoming } = useScheduleBlocks(scheduleFrom, scheduleTo)
-  const { data: entries } = useTimeEntries(weekStart.toISOString(), weekEnd.toISOString())
+  const { data: weekBlocks } = useScheduleBlocks(weekStart.toISOString(), weekEnd.toISOString())
+  const { data: templates } = useScheduleTemplates(myNanny?.id)
   const { data: pending } = usePendingTimeOff()
   const { data: activities } = useChildActivities()
-  const { data: activeClock } = useActiveClockEntry()
 
-  const weekMinutes = entries?.reduce((s, e) => s + entryWorkedMinutes(e), 0) ?? 0
+  const weekMinutes = useMemo(() => {
+    if (!weekBlocks || !myNanny?.id) return 0
+    const shifts = payableShiftsInPeriod(
+      weekBlocks,
+      (templates ?? []) as NannyScheduleTemplate[],
+      myNanny.id,
+      weekStart,
+      weekEnd,
+    )
+    return shifts.reduce((s, sh) => s + payableShiftMinutes(sh), 0)
+  }, [weekBlocks, templates, myNanny?.id, weekStart, weekEnd])
+
   const myUpcoming = upcoming?.slice(0, 5)
 
   return (
@@ -37,31 +54,15 @@ export function DashboardPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {isNanny && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Time clock</CardTitle>
-              <CardDescription>
-                {activeClock ? 'You are clocked in' : 'Not currently clocked in'}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button asChild>
-                <Link to="/hours">{activeClock ? 'View clock' : 'Clock in'}</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">This week</CardTitle>
-            <CardDescription>Hours logged</CardDescription>
+            <CardDescription>Scheduled hours (including late adjustments)</CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-semibold">{formatHours(weekMinutes)}</p>
             <Button variant="link" className="mt-2 px-0" asChild>
-              <Link to="/hours">View all hours</Link>
+              <Link to="/schedule">View schedule</Link>
             </Button>
           </CardContent>
         </Card>
@@ -96,10 +97,11 @@ export function DashboardPage() {
                   <div>
                     <p className="font-medium">{format(parseISO(s.starts_at), 'EEE, MMM d')}</p>
                     <p className="text-sm text-[var(--color-muted-foreground)]">
-                      {format(parseISO(s.starts_at), 'h:mm a')} – {format(parseISO(s.ends_at), 'h:mm a')}
+                      {format(parseISO(s.starts_at), 'h:mm a')} –{' '}
+                      {format(parseISO(effectiveEndIso(s)), 'h:mm a')}
                     </p>
                   </div>
-                  <Badge variant={s.status === 'scheduled' ? 'secondary' : 'outline'}>{s.status}</Badge>
+                  {blockHasLateReport(s) && <Badge variant="warning">Late</Badge>}
                 </li>
               ))}
             </ul>

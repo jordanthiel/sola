@@ -66,13 +66,13 @@ export function EditDayDialog({ target, onClose }: EditDayDialogProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <motionDiv className="w-full max-w-md rounded-lg border bg-[var(--color-card)] p-6 shadow-lg">
+      <div className="w-full max-w-md rounded-lg border bg-[var(--color-card)] p-6 shadow-lg">
         <h2 className="text-lg font-semibold">Change times for {format(target.day, 'EEEE, MMM d')}</h2>
         <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">
           Override the usual schedule for this day only.
         </p>
         <div className="mt-4 space-y-4">
-          <motionDiv className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Start</Label>
               <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
@@ -81,32 +81,22 @@ export function EditDayDialog({ target, onClose }: EditDayDialogProps) {
               <Label>End</Label>
               <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
             </div>
-          </motionDiv>
+          </div>
           <div className="space-y-2">
             <Label>Notes (optional)</Label>
-            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
+            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
           {error && <p className="text-sm text-red-600">{error}</p>}
-          <motionDiv className="flex justify-end gap-2">
+          <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={onClose}>
               Cancel
             </Button>
             <Button onClick={() => save.mutate()} disabled={save.isPending}>
               {save.isPending ? 'Saving...' : 'Save'}
             </Button>
-          </motionDiv>
+          </div>
         </div>
-      </motionDiv>
-    </motionDiv>
+      </div>
+    </div>
   )
-}
-
-function motionDiv({
-  className,
-  children,
-}: {
-  className?: string
-  children: React.ReactNode
-}) {
-  return <motionDiv className={className}>{children}</motionDiv>
 }

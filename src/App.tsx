@@ -14,7 +14,6 @@ import { ClaimNannyPage } from '@/pages/auth/ClaimNannyPage'
 import { CreateHouseholdPage } from '@/pages/onboarding/CreateHousehold'
 import { DashboardPage } from '@/pages/dashboard/DashboardPage'
 import { SchedulePage } from '@/pages/schedule/SchedulePage'
-import { HoursPage } from '@/pages/time/HoursPage'
 import { PayrollPage } from '@/pages/payroll/PayrollPage'
 import { TimeOffPage } from '@/pages/time-off/TimeOffPage'
 import { ChildrenPage } from '@/pages/children/ChildrenPage'
@@ -39,7 +38,7 @@ export default function App() {
                   <Route element={<AppShell />}>
                     <Route index element={<DashboardPage />} />
                     <Route path="schedule" element={<SchedulePage />} />
-                    <Route path="hours" element={<HoursPage />} />
+                    <Route path="hours" element={<Navigate to="/schedule" replace />} />
                     <Route path="payroll" element={<PayrollPage />} />
                     <Route path="time-off" element={<TimeOffPage />} />
                     <Route path="children" element={<ChildrenPage />} />

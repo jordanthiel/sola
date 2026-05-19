@@ -1,13 +1,6 @@
-import {
-  addDays,
-  addWeeks,
-  differenceInMinutes,
-  endOfMonth,
-  parseISO,
-  startOfMonth,
-  startOfWeek,
-} from 'date-fns'
-import type { EmploymentSetting, PayPeriodType, TimeEntry } from '@/types/database'
+import { addDays, addWeeks, endOfMonth, startOfMonth, startOfWeek } from 'date-fns'
+import type { EmploymentSetting, PayPeriodType } from '@/types/database'
+import { type PayableShift, payableShiftMinutes } from '@/lib/schedule-hours'
 
 export function getPayPeriodBounds(
   payPeriod: PayPeriodType,
@@ -27,12 +20,6 @@ export function getPayPeriodBounds(
   return { start, end: endOfMonth(anchor) }
 }
 
-export function entryWorkedMinutes(entry: TimeEntry): number {
-  if (!entry.clock_out) return 0
-  const total = differenceInMinutes(parseISO(entry.clock_out), parseISO(entry.clock_in))
-  return Math.max(0, total - entry.break_minutes)
-}
-
 export interface PayrollSummary {
   totalMinutes: number
   regularMinutes: number
@@ -45,18 +32,13 @@ export interface PayrollSummary {
 }
 
 export function calculatePayroll(
-  entries: TimeEntry[],
+  shifts: PayableShift[],
   settings: EmploymentSetting,
-  periodStart: Date,
-  periodEnd: Date,
+  _periodStart: Date,
+  _periodEnd: Date,
   openAdvancesCents: number,
 ): PayrollSummary {
-  const inPeriod = entries.filter((e) => {
-    const clockIn = parseISO(e.clock_in)
-    return clockIn >= periodStart && clockIn <= addDays(periodEnd, 1)
-  })
-
-  const totalMinutes = inPeriod.reduce((sum, e) => sum + entryWorkedMinutes(e), 0)
+  const totalMinutes = shifts.reduce((sum, s) => sum + payableShiftMinutes(s), 0)
 
   const weeks =
     settings.pay_period === 'monthly'
@@ -89,26 +71,22 @@ export function calculatePayroll(
   }
 }
 
-export function exportTimeEntriesCsv(
-  entries: TimeEntry[],
+export function exportShiftsCsv(
+  shifts: PayableShift[],
   profiles: Record<string, string>,
 ): string {
-  const header = 'Date,Clock In,Clock Out,Break (min),Worked (min),Nanny,Source,Notes'
-  const rows = entries.map((e) => {
-    const worked = entryWorkedMinutes(e)
-    const date = e.clock_in.split('T')[0]
+  const header = 'Date,Start,Scheduled End,Actual End,Break (min),Worked (min),Nanny'
+  const rows = shifts.map((s) => {
+    const worked = payableShiftMinutes(s)
+    const date = s.starts_at.split('T')[0]
     return [
       date,
-      e.clock_in,
-      e.clock_out ?? '',
-      e.break_minutes,
+      s.starts_at,
+      s.ends_at,
+      s.actual_ends_at ?? '',
+      s.break_minutes,
       worked,
-      (e.household_nanny_id && profiles[e.household_nanny_id]) ??
-        e.nanny_user_id ??
-        e.household_nanny_id ??
-        '',
-      e.source,
-      (e.notes ?? '').replace(/"/g, '""'),
+      profiles[s.household_nanny_id] ?? s.household_nanny_id,
     ]
       .map((v) => `"${v}"`)
       .join(',')

@@ -8,10 +8,13 @@ import {
   useMyHouseholdNanny,
   useNannies,
   usePaymentAdvances,
-  useTimeEntries,
+  useScheduleBlocks,
+  useScheduleTemplates,
 } from '@/hooks/useHouseholdData'
 import { nannyDisplayName } from '@/lib/nanny'
 import { calculatePayroll, getPayPeriodBounds } from '@/lib/payroll'
+import { payableShiftsInPeriod } from '@/lib/schedule-hours'
+import type { NannyScheduleTemplate } from '@/types/schedule-template'
 import { formatCurrency, formatHours } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -39,7 +42,8 @@ export function PayrollPage() {
   const from = period?.start.toISOString()
   const to = period?.end.toISOString()
 
-  const { data: entries } = useTimeEntries(from, to, householdNannyId)
+  const { data: blocks } = useScheduleBlocks(from, to)
+  const { data: templates } = useScheduleTemplates(householdNannyId)
   const { data: advances } = usePaymentAdvances(householdNannyId)
   const qc = useQueryClient()
 
@@ -49,9 +53,16 @@ export function PayrollPage() {
     advances?.filter((a) => a.status === 'open').reduce((s, a) => s + a.amount_cents, 0) ?? 0
 
   const summary = useMemo(() => {
-    if (!settings || !entries || !period) return null
-    return calculatePayroll(entries, settings, period.start, period.end, openAdvancesCents)
-  }, [settings, entries, period, openAdvancesCents])
+    if (!settings || !blocks || !period || !householdNannyId) return null
+    const shifts = payableShiftsInPeriod(
+      blocks,
+      (templates ?? []) as NannyScheduleTemplate[],
+      householdNannyId,
+      period.start,
+      period.end,
+    )
+    return calculatePayroll(shifts, settings, period.start, period.end, openAdvancesCents)
+  }, [settings, blocks, templates, period, householdNannyId, openAdvancesCents])
 
   const createAdvance = useMutation({
     mutationFn: async () => {
@@ -89,7 +100,9 @@ export function PayrollPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Payroll</h1>
-        <p className="text-[var(--color-muted-foreground)]">Hours, overtime, and advances</p>
+        <p className="text-[var(--color-muted-foreground)]">
+          Based on scheduled hours and any late-day adjustments from the schedule
+        </p>
       </div>
 
       <Card>
