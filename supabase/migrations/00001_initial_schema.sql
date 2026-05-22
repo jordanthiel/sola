@@ -1,5 +1,17 @@
 -- Nanny Management initial schema
 
+-- gen_random_bytes requires pgcrypto (Supabase installs it in the extensions schema)
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
+
+CREATE OR REPLACE FUNCTION public.gen_hex_token(bytes integer DEFAULT 32)
+RETURNS text
+LANGUAGE sql
+VOLATILE
+SET search_path = public, extensions
+AS $$
+  SELECT encode(extensions.gen_random_bytes(bytes), 'hex');
+$$;
+
 -- Enums
 CREATE TYPE member_role AS ENUM ('owner', 'parent', 'nanny');
 CREATE TYPE member_status AS ENUM ('active', 'invited');
@@ -47,7 +59,7 @@ CREATE TABLE household_invites (
   household_id UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
   email TEXT NOT NULL,
   role member_role NOT NULL DEFAULT 'nanny',
-  token TEXT NOT NULL UNIQUE DEFAULT encode(gen_random_bytes(32), 'hex'),
+  token TEXT NOT NULL UNIQUE DEFAULT public.gen_hex_token(32),
   invited_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   expires_at TIMESTAMPTZ NOT NULL DEFAULT (now() + interval '7 days'),
   accepted_at TIMESTAMPTZ,

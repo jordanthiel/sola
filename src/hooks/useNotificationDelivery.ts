@@ -95,7 +95,11 @@ export function useNotificationDelivery() {
       if (error || !data || cancelled) return
 
       for (const row of data) {
-        if (!(await shouldSendEmail(row, user!.id))) continue
+        const notification = row as Pick<
+          AppNotification,
+          'household_id' | 'category' | 'email_sent_at'
+        >
+        if (!(await shouldSendEmail(notification, user!.id))) continue
         try {
           await sendNotificationEmail({
             to: user!.email!,

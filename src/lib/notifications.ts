@@ -1,5 +1,4 @@
 import { FunctionsHttpError } from '@supabase/supabase-js'
-import { APP_NAME } from '@/lib/app'
 import { buildInviteEmailHtml, buildNotificationEmailHtml } from '@/lib/email-templates'
 import { supabase } from '@/lib/supabase'
 import type { NotificationCategories, NotificationCategory } from '@/types/features'

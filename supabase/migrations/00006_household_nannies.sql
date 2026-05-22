@@ -249,7 +249,7 @@ BEGIN
     RAISE EXCEPTION 'Only parents can create claim links';
   END IF;
 
-  v_token := encode(gen_random_bytes(32), 'hex');
+  v_token := public.gen_hex_token(32);
 
   UPDATE household_nannies
   SET
