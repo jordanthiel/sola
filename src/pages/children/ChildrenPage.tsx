@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { format, parseISO } from 'date-fns'
+import { format, parseISO, subYears } from 'date-fns'
 import { toast } from 'sonner'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
@@ -132,7 +132,14 @@ export function ChildrenPage() {
             </div>
             <div className="space-y-2">
               <Label>Date of birth</Label>
-              <DatePicker value={dob} onChange={setDob} />
+              <DatePicker
+                value={dob}
+                onChange={setDob}
+                captionLayout="dropdown"
+                reverseYears
+                max={format(new Date(), 'yyyy-MM-dd')}
+                min={format(subYears(new Date(), 25), 'yyyy-MM-dd')}
+              />
             </div>
             <div className="space-y-2">
               <Label>Notes</Label>
