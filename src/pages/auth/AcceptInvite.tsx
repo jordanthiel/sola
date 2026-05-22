@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { authRedirectQuery } from '@/lib/auth-redirect'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useHousehold } from '@/contexts/HouseholdContext'
@@ -37,6 +38,9 @@ export function AcceptInvitePage() {
     }
   }
 
+  const invitePath = token ? `/invite?token=${encodeURIComponent(token)}` : '/invite'
+  const authQuery = authRedirectQuery(invitePath)
+
   if (!user) {
     return (
       <div className="flex min-h-screen items-center justify-center p-4">
@@ -47,10 +51,10 @@ export function AcceptInvitePage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <Button asChild className="w-full">
-              <Link to={`/login?redirect=/invite?token=${token}`}>Sign in</Link>
+              <Link to={`/login?${authQuery}`}>Sign in</Link>
             </Button>
             <Button asChild variant="outline" className="w-full">
-              <Link to={`/signup`}>Sign up</Link>
+              <Link to={`/signup?${authQuery}`}>Sign up</Link>
             </Button>
           </CardContent>
         </Card>
@@ -63,7 +67,7 @@ export function AcceptInvitePage() {
       <Card className="max-w-md">
         <CardHeader>
           <CardTitle>Join household</CardTitle>
-          <CardDescription>Accept your invitation to join as nanny.</CardDescription>
+          <CardDescription>Accept your invitation to join this household.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {error && <p className="text-sm text-red-600">{error}</p>}

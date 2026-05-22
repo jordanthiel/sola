@@ -1,30 +1,43 @@
 @import 'tailwindcss';
 
 @theme {
-  --color-background: oklch(0.99 0.002 286);
-  --color-foreground: oklch(0.2 0.02 286);
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+
+  --color-background: oklch(0.985 0.004 85);
+  --color-foreground: oklch(0.22 0.02 265);
   --color-card: oklch(1 0 0);
-  --color-card-foreground: oklch(0.2 0.02 286);
-  --color-primary: oklch(0.45 0.12 250);
+  --color-card-foreground: oklch(0.22 0.02 265);
+  --color-primary: oklch(0.52 0.11 175);
   --color-primary-foreground: oklch(0.99 0 0);
-  --color-secondary: oklch(0.96 0.01 286);
-  --color-secondary-foreground: oklch(0.3 0.02 286);
-  --color-muted: oklch(0.96 0.01 286);
-  --color-muted-foreground: oklch(0.5 0.02 286);
-  --color-accent: oklch(0.94 0.03 250);
-  --color-accent-foreground: oklch(0.3 0.08 250);
+  --color-secondary: oklch(0.96 0.02 175);
+  --color-secondary-foreground: oklch(0.35 0.06 175);
+  --color-muted: oklch(0.96 0.006 85);
+  --color-muted-foreground: oklch(0.5 0.02 265);
+  --color-accent: oklch(0.94 0.03 175);
+  --color-accent-foreground: oklch(0.32 0.08 175);
   --color-destructive: oklch(0.55 0.2 25);
   --color-destructive-foreground: oklch(0.99 0 0);
-  --color-border: oklch(0.9 0.01 286);
-  --color-input: oklch(0.9 0.01 286);
-  --color-ring: oklch(0.45 0.12 250);
-  --radius-sm: 0.375rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.75rem;
+  --color-border: oklch(0.91 0.01 85);
+  --color-input: oklch(0.91 0.01 85);
+  --color-ring: oklch(0.52 0.11 175);
+  --color-sidebar: oklch(0.995 0.003 85);
+  --color-sidebar-border: oklch(0.92 0.01 85);
+
+  --radius-sm: 0.5rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.875rem;
+  --radius-xl: 1rem;
+
+  --shadow-card: 0 1px 2px oklch(0.2 0.02 265 / 0.04), 0 4px 16px oklch(0.2 0.02 265 / 0.06);
+  --shadow-elevated: 0 4px 6px oklch(0.2 0.02 265 / 0.04), 0 12px 32px oklch(0.2 0.02 265 / 0.08);
 }
 
 * {
   border-color: var(--color-border);
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
@@ -32,9 +45,82 @@ body {
   min-height: 100vh;
   background: var(--color-background);
   color: var(--color-foreground);
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 #root {
   min-height: 100vh;
+}
+
+/* Subtle ambient background on app pages */
+.app-canvas {
+  background:
+    radial-gradient(ellipse 80% 50% at 100% -10%, oklch(0.92 0.04 175 / 0.35), transparent 50%),
+    radial-gradient(ellipse 60% 40% at 0% 100%, oklch(0.94 0.03 85 / 0.5), transparent 45%),
+    var(--color-background);
+}
+
+/* react-day-picker theme */
+.rdp-root {
+  --rdp-accent-color: var(--color-primary);
+  --rdp-accent-background-color: var(--color-accent);
+  --rdp-day-height: 2.25rem;
+  --rdp-day-width: 2.25rem;
+}
+
+select {
+  appearance: none;
+  background-color: var(--color-card);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  padding-right: 2.25rem !important;
+}
+
+/* Page typography */
+.page-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+  color: var(--color-foreground);
+}
+
+.page-subtitle {
+  margin-top: 0.375rem;
+  font-size: 0.9375rem;
+  color: var(--color-muted-foreground);
+  line-height: 1.5;
+}
+
+/* Dashboard stat cards */
+.stat-card {
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-border);
+  background: var(--color-card);
+  box-shadow: var(--shadow-card);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.stat-card:hover {
+  box-shadow: var(--shadow-elevated);
+}
+
+.stat-card-highlight {
+  border-color: oklch(0.85 0.06 175);
+  background: linear-gradient(
+    135deg,
+    oklch(0.98 0.02 175) 0%,
+    var(--color-card) 100%
+  );
+}
+
+/* Auth marketing panel */
+.auth-gradient {
+  background:
+    radial-gradient(ellipse 120% 80% at 20% 0%, oklch(0.75 0.12 175 / 0.45), transparent 55%),
+    radial-gradient(ellipse 80% 60% at 100% 100%, oklch(0.7 0.08 200 / 0.3), transparent 50%),
+    linear-gradient(160deg, oklch(0.42 0.1 175) 0%, oklch(0.35 0.08 200) 100%);
 }

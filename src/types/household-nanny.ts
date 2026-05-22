@@ -9,7 +9,11 @@ export interface HouseholdNanny {
   user_id: string | null
   claim_token: string | null
   claim_token_expires_at: string | null
+  claim_invite_sent_at: string | null
+  claim_invite_sent_by: string | null
   claimed_at: string | null
+  deactivated_at: string | null
+  deactivated_by: string | null
   created_at: string
   updated_at: string
 }

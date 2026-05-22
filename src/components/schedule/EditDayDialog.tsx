@@ -5,8 +5,8 @@ import { supabase } from '@/lib/supabase'
 import { useHousehold } from '@/contexts/HouseholdContext'
 import { formatSupabaseError } from '@/lib/errors'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { TimePicker } from '@/components/ui/time-picker'
 import { Textarea } from '@/components/ui/textarea'
 import type { ScheduleDayTarget } from '@/types/schedule-day'
 
@@ -75,11 +75,11 @@ export function EditDayDialog({ target, onClose }: EditDayDialogProps) {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Start</Label>
-              <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+              <TimePicker value={startTime} onChange={setStartTime} />
             </div>
             <div className="space-y-2">
               <Label>End</Label>
-              <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+              <TimePicker value={endTime} onChange={setEndTime} />
             </div>
           </div>
           <div className="space-y-2">

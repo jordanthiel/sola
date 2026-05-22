@@ -1,23 +1,42 @@
 import { useState } from 'react'
-import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
+import {
+  accountKindFromRedirect,
+  authRedirectQuery,
+  getPostAuthRedirect,
+  postAuthDestination,
+} from '@/lib/auth-redirect'
+import { claimPathWithToken, getPersistedClaimToken } from '@/lib/claim-link'
+import { AuthLayout } from '@/components/layout/AuthLayout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 
 export function LoginPage() {
   const { signIn, user } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? '/'
+  const [searchParams] = useSearchParams()
+  const stateFrom = (location.state as { from?: { pathname: string; search?: string } })?.from
+  const statePath = stateFrom
+    ? `${stateFrom.pathname}${stateFrom.search ?? ''}`
+    : null
+  const redirectPath = getPostAuthRedirect(searchParams)
+  const loginHint = accountKindFromRedirect(redirectPath ?? statePath)
+  const afterAuth = postAuthDestination(
+    searchParams,
+    loginHint === 'nanny' ? claimPathWithToken(getPersistedClaimToken()) : statePath ?? '/',
+  )
+  const redirectQuery = redirectPath ? `?${authRedirectQuery(redirectPath)}` : ''
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  if (user) return <Navigate to={from} replace />
+  if (user) return <Navigate to={afterAuth} replace />
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -25,7 +44,7 @@ export function LoginPage() {
     setLoading(true)
     try {
       await signIn(email, password)
-      navigate(from)
+      navigate(afterAuth, { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign in failed')
     } finally {
@@ -34,13 +53,9 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>Welcome back</CardTitle>
-          <CardDescription>Sign in to manage your nanny household</CardDescription>
-        </CardHeader>
-        <CardContent>
+    <AuthLayout title="Welcome back" subtitle="Sign in to manage your nanny household">
+      <Card>
+        <CardContent className="pt-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
@@ -56,19 +71,24 @@ export function LoginPage() {
                 required
               />
             </div>
-            {error && <p className="text-sm text-red-600">{error}</p>}
-            <Button type="submit" className="w-full" disabled={loading}>
+            {error && (
+              <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-700">{error}</p>
+            )}
+            <Button type="submit" className="w-full" size="lg" disabled={loading}>
               {loading ? 'Signing in...' : 'Sign in'}
             </Button>
           </form>
-          <p className="mt-4 text-center text-sm text-[var(--color-muted-foreground)]">
+          <p className="mt-6 text-center text-sm text-[var(--color-muted-foreground)]">
             No account?{' '}
-            <Link to="/signup" className="text-[var(--color-primary)] hover:underline">
-              Sign up
+            <Link
+              to={`/signup${redirectQuery}`}
+              className="font-semibold text-[var(--color-primary)] hover:underline"
+            >
+              Create one
             </Link>
           </p>
         </CardContent>
       </Card>
-    </div>
+    </AuthLayout>
   )
 }

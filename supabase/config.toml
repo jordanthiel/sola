@@ -24,3 +24,8 @@ enable_signup = true
 [auth.email]
 enable_signup = true
 enable_confirmations = false
+
+# Platform JWT verify fails locally with ES256 (CryptoKey vs Uint8Array).
+# send-email validates the caller via supabase.auth.getUser() instead.
+[functions.send-email]
+verify_jwt = false

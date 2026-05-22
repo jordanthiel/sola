@@ -1,9 +1,13 @@
+import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
+import { mergeScheduleWithTemplates } from '@/lib/schedule'
+import type { ScheduleCoverageItem } from '@/lib/plan-attendee'
 import { useAuth } from '@/contexts/AuthContext'
 import { useHousehold } from '@/contexts/HouseholdContext'
 import type { HouseholdNanny } from '@/types/household-nanny'
 import type { NannyScheduleTemplate } from '@/types/schedule-template'
+import type { AdvanceRepayment } from '@/types/advance-repayment'
 import type {
   Child,
   ChildActivity,
@@ -17,23 +21,29 @@ import type {
   PtoBalance,
 } from '@/types/database'
 
-export function useHouseholdNannies() {
+export function useHouseholdNannies(options?: { includeDeactivated?: boolean }) {
   const { activeHousehold } = useHousehold()
+  const includeDeactivated = options?.includeDeactivated ?? false
   return useQuery({
-    queryKey: ['household_nannies', activeHousehold?.id],
+    queryKey: ['household_nannies', activeHousehold?.id, includeDeactivated],
     enabled: !!activeHousehold,
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('household_nannies')
         .select('*')
         .eq('household_id', activeHousehold!.id)
         .order('first_name')
+      if (!includeDeactivated) {
+        query = query.is('deactivated_at', null)
+      }
+      const { data, error } = await query
       if (error) throw error
       return data as HouseholdNanny[]
     },
   })
 }
 
+/** Active nannies only — payroll, schedule, time off, etc. */
 export function useNannies() {
   return useHouseholdNannies()
 }
@@ -50,6 +60,7 @@ export function useMyHouseholdNanny() {
         .select('*')
         .eq('household_id', activeHousehold!.id)
         .eq('user_id', user!.id)
+        .not('claimed_at', 'is', null)
         .maybeSingle()
       if (error) throw error
       return data as HouseholdNanny | null
@@ -86,14 +97,18 @@ export function useMembers() {
   })
 }
 
-export function useScheduleTemplates(householdNannyId?: string) {
+export function useScheduleTemplates(
+  householdNannyId?: string,
+  options?: { enabled?: boolean },
+) {
   const { activeHousehold, isNanny } = useHousehold()
   const { data: myNanny, isFetched: myNannyFetched } = useMyHouseholdNanny()
   const effectiveId = isNanny ? myNanny?.id : householdNannyId
 
   return useQuery({
     queryKey: ['schedule_templates', activeHousehold?.id, effectiveId ?? 'all'],
-    enabled: !!activeHousehold && (!isNanny || myNannyFetched),
+    enabled:
+      (options?.enabled ?? true) && !!activeHousehold && (!isNanny || myNannyFetched),
     queryFn: async () => {
       let q = supabase
         .from('nanny_schedule_templates')
@@ -108,13 +123,42 @@ export function useScheduleTemplates(householdNannyId?: string) {
   })
 }
 
-export function useScheduleBlocks(from?: string, to?: string) {
+export function useMergedSchedule(range?: { from: Date; to: Date }) {
+  const fromIso = range?.from.toISOString()
+  const toIso = range?.to.toISOString()
+  const { data: blocks, isLoading: blocksLoading } = useScheduleBlocks(fromIso, toIso)
+  const { data: templates, isLoading: templatesLoading } = useScheduleTemplates()
+  const { data: nannies } = useNannies()
+
+  const merged = useMemo(() => {
+    if (!range || !blocks || !nannies?.length) return [] as ScheduleCoverageItem[]
+    return mergeScheduleWithTemplates(
+      blocks,
+      templates ?? [],
+      range.from,
+      range.to,
+      nannies.map((n) => n.id),
+    )
+  }, [blocks, templates, nannies, range])
+
+  return {
+    data: merged,
+    isLoading: blocksLoading || templatesLoading,
+  }
+}
+
+export function useScheduleBlocks(
+  from?: string,
+  to?: string,
+  options?: { enabled?: boolean },
+) {
   const { activeHousehold, isNanny } = useHousehold()
   const { data: myNanny, isFetched: myNannyFetched } = useMyHouseholdNanny()
 
   return useQuery({
     queryKey: ['schedule', activeHousehold?.id, from, to, isNanny ? myNanny?.id ?? 'none' : 'all'],
-    enabled: !!activeHousehold && (!isNanny || myNannyFetched),
+    enabled:
+      (options?.enabled ?? true) && !!activeHousehold && (!isNanny || myNannyFetched),
     queryFn: async () => {
       if (isNanny && !myNanny) return [] as ScheduleBlock[]
 
@@ -190,6 +234,7 @@ export function useEmploymentSettings(householdNannyId?: string) {
         .select('*')
         .eq('household_id', activeHousehold!.id)
         .order('effective_from', { ascending: false })
+        .order('created_at', { ascending: false })
       if (householdNannyId) q = q.eq('household_nanny_id', householdNannyId)
       const { data, error } = await q
       if (error) throw error
@@ -213,6 +258,32 @@ export function usePaymentAdvances(householdNannyId?: string) {
       const { data, error } = await q
       if (error) throw error
       return data as PaymentAdvance[]
+    },
+  })
+}
+
+export function useAdvanceRepayments(householdNannyId?: string) {
+  const { activeHousehold } = useHousehold()
+  return useQuery({
+    queryKey: ['advance_repayments', activeHousehold?.id, householdNannyId],
+    enabled: !!activeHousehold && !!householdNannyId,
+    queryFn: async () => {
+      const { data: advances, error: aErr } = await supabase
+        .from('payment_advances')
+        .select('id')
+        .eq('household_id', activeHousehold!.id)
+        .eq('household_nanny_id', householdNannyId!)
+      if (aErr) throw aErr
+      if (!advances?.length) return [] as AdvanceRepayment[]
+
+      const ids = advances.map((a) => a.id)
+      const { data, error } = await supabase
+        .from('advance_repayments')
+        .select('*')
+        .in('payment_advance_id', ids)
+        .order('paid_on', { ascending: false })
+      if (error) throw error
+      return data as AdvanceRepayment[]
     },
   })
 }
@@ -272,10 +343,13 @@ export function useChildren() {
   })
 }
 
-export function useChildActivities(childId?: string) {
+export function useChildActivities(
+  childId?: string,
+  range?: { from: string; to: string },
+) {
   const { activeHousehold } = useHousehold()
   return useQuery({
-    queryKey: ['activities', activeHousehold?.id, childId],
+    queryKey: ['activities', activeHousehold?.id, childId, range?.from, range?.to],
     enabled: !!activeHousehold,
     queryFn: async () => {
       let q = supabase
@@ -283,20 +357,31 @@ export function useChildActivities(childId?: string) {
         .select('*')
         .eq('household_id', activeHousehold!.id)
         .order('occurred_at', { ascending: false })
-        .limit(50)
+      if (range) {
+        q = q.gte('occurred_at', range.from).lte('occurred_at', range.to)
+      } else {
+        q = q.limit(50)
+      }
       if (childId) q = q.eq('child_id', childId)
       const { data: activities, error } = await q
       if (error) throw error
       if (!activities?.length) return []
 
       const childIds = [...new Set(activities.map((a) => a.child_id))]
-      const { data: kids } = await supabase.from('children').select('id, name').in('id', childIds)
+      const { data: kids } = await supabase
+        .from('children')
+        .select('id, name, color_key')
+        .in('id', childIds)
       const childMap = Object.fromEntries((kids ?? []).map((c) => [c.id, c]))
 
       return activities.map((a) => ({
         ...a,
-        children: childMap[a.child_id] ? { name: childMap[a.child_id].name } : null,
-      })) as (ChildActivity & { children: { name: string } | null })[]
+        children: childMap[a.child_id]
+          ? { name: childMap[a.child_id].name, color_key: childMap[a.child_id].color_key }
+          : null,
+      })) as (ChildActivity & {
+        children: { name: string; color_key: Child['color_key'] } | null
+      })[]
     },
   })
 }

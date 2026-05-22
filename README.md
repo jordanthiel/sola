@@ -1,4 +1,4 @@
-# NannyCare
+# Sova Home
 
 A multi-household nanny management app for families. Parents manage schedules, payroll, and invites; nannies log hours, time off, and child activities.
 
@@ -11,13 +11,18 @@ A multi-household nanny management app for families. Parents manage schedules, p
 
 - Multi-household tenancy with role-based access (`owner`, `parent`, `nanny`)
 - Schedule planning (past and upcoming shifts)
-- Time tracking (manual entry + clock in/out)
-- Overtime and payroll preview by pay period
+- Payroll preview: scheduled vs actual hours, bonuses, mileage, pay period close, pay stub PDF
 - Payment advance tracking
 - Sick / PTO requests and balances
-- Children profiles and activity log
-- CSV export for time entries
-- Email invites for nannies
+- Children care sheets (allergies, meds, routines) and emergency contacts
+- Kids' plans (one-off and recurring), multi-child plans
+- Documents hub (contracts, tax forms, etc.)
+- Household feed with @mentions
+- Incident log with notifications
+- In-app notifications with per-category settings
+- Email invites (parent + nanny claim links via Resend)
+- CSV export (shifts and payroll summary)
+- Nanny dashboard (multi-household, PTO, payroll preview, mentions)
 
 ## Prerequisites
 
@@ -57,9 +62,29 @@ npx supabase start
 npx supabase db reset
 ```
 
-Migration file: [`supabase/migrations/00001_initial_schema.sql`](supabase/migrations/00001_initial_schema.sql)
+Apply all files in [`supabase/migrations/`](supabase/migrations/) (through `00017_storage_documents.sql`).
 
-### 4. Start the app
+### 4. Email edge function (optional)
+
+**Local** (with `supabase start` running):
+
+```bash
+# Put RESEND_API_KEY in supabase/functions/.env (see supabase/functions/.env.example)
+npx supabase functions serve send-email
+```
+
+Do not pass `--env-file` unless that file also includes `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` from `supabase status` — otherwise auth to the function fails. Restart after changing `supabase/config.toml`.
+
+**Hosted:**
+
+```bash
+npx supabase functions deploy send-email
+npx supabase secrets set RESEND_API_KEY=re_xxxx EMAIL_FROM="Sova Home <hello@sova.baby>"
+```
+
+Invites send email when Resend is configured.
+
+### 5. Start the app
 
 ```bash
 npm run dev
@@ -70,7 +95,7 @@ Open [http://localhost:5173](http://localhost:5173).
 ## Usage flow
 
 1. **Sign up** as a parent and **create a household** (onboarding wizard).
-2. **Invite your nanny** in Settings → enter their email and share the invite link.
+2. **Invite your nanny** in Settings → email sends automatically when Resend is configured.
 3. Nanny **signs up** (or signs in) and opens the invite link to join.
 4. Configure **employment settings** (hourly rate, OT multiplier, pay period) in Settings.
 5. Add **children**, build the **schedule**, and start logging **hours** and **activities**.

@@ -5,7 +5,7 @@ import { useHousehold } from '@/contexts/HouseholdContext'
 import { useScheduleTemplates } from '@/hooks/useHouseholdData'
 import { formatSupabaseError } from '@/lib/errors'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { TimePicker } from '@/components/ui/time-picker'
 import {
   WEEKDAYS,
   draftFromTemplates,
@@ -128,21 +128,21 @@ export function DefaultScheduleEditor({ householdNannyId }: DefaultScheduleEdito
                     />
                   </td>
                   <td className="py-2 pr-2">
-                    <Input
-                      type="time"
+                    <TimePicker
                       value={day.start_time}
                       disabled={!day.enabled}
-                      onChange={(e) => updateDay(dow, { start_time: e.target.value })}
+                      onChange={(v) => updateDay(dow, { start_time: v })}
                       className="h-9"
+                      minuteStep={15}
                     />
                   </td>
                   <td className="py-2">
-                    <Input
-                      type="time"
+                    <TimePicker
                       value={day.end_time}
                       disabled={!day.enabled}
-                      onChange={(e) => updateDay(dow, { end_time: e.target.value })}
+                      onChange={(v) => updateDay(dow, { end_time: v })}
                       className="h-9"
+                      minuteStep={15}
                     />
                   </td>
                 </tr>

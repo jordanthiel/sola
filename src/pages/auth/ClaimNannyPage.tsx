@@ -1,40 +1,27 @@
-import { useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { supabase } from '@/lib/supabase'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
-import { useHousehold } from '@/contexts/HouseholdContext'
-import { formatSupabaseError } from '@/lib/errors'
+import { useNannyClaim } from '@/hooks/useNannyClaim'
+import { authRedirectQuery } from '@/lib/auth-redirect'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
-export function ClaimNannyPage() {
-  const [params] = useSearchParams()
-  const token = params.get('token') ?? ''
-  const { user } = useAuth()
-  const { refreshHouseholds } = useHousehold()
-  const navigate = useNavigate()
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+function claimUrl(token: string) {
+  return token ? `/claim?token=${encodeURIComponent(token)}` : '/claim'
+}
 
-  async function claim() {
-    if (!token) {
-      setError('Missing claim link')
-      return
-    }
-    setLoading(true)
-    setError('')
-    try {
-      const { error: fnError } = await supabase.rpc('claim_nanny_profile', {
-        p_claim_token: token,
-      })
-      if (fnError) throw fnError
-      await refreshHouseholds()
-      navigate('/', { replace: true })
-    } catch (err) {
-      setError(formatSupabaseError(err))
-    } finally {
-      setLoading(false)
-    }
+export function ClaimNannyPage() {
+  const [searchParams] = useSearchParams()
+  const token = (searchParams.get('token') ?? '').trim()
+  const { user } = useAuth()
+  const { error, claiming, tryClaim, authLoading } = useNannyClaim(token)
+  const authQuery = authRedirectQuery(claimUrl(token))
+
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-4">
+        <p className="text-[var(--color-muted-foreground)]">Loading...</p>
+      </div>
+    )
   }
 
   if (!user) {
@@ -44,15 +31,15 @@ export function ClaimNannyPage() {
           <CardHeader>
             <CardTitle>Claim your nanny profile</CardTitle>
             <CardDescription>
-              Sign in or create an account using the email your family has on file, then return to this link.
+              Sign in or create an account with the same email your family used for this nanny profile.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <Button asChild className="w-full">
-              <Link to={`/login?redirect=/claim?token=${encodeURIComponent(token)}`}>Sign in</Link>
+              <Link to={`/login?${authQuery}`}>Sign in</Link>
             </Button>
             <Button asChild variant="outline" className="w-full">
-              <Link to={`/signup?redirect=/claim?token=${encodeURIComponent(token)}`}>Sign up</Link>
+              <Link to={`/signup?${authQuery}`}>Sign up</Link>
             </Button>
           </CardContent>
         </Card>
@@ -66,17 +53,27 @@ export function ClaimNannyPage() {
         <CardHeader>
           <CardTitle>Claim your nanny profile</CardTitle>
           <CardDescription>
-            Link this account to your household so you can view schedules, log hours, and record activities.
+            {claiming
+              ? 'Linking your account...'
+              : token
+                ? 'Connecting you to your household.'
+                : 'Use the invite link from your email (it includes a token in the URL).'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {error && <p className="text-sm text-red-600">{error}</p>}
-          <Button className="w-full" onClick={claim} disabled={loading || !token}>
-            {loading ? 'Claiming...' : 'Claim profile'}
-          </Button>
+          {!claiming && token && error && (
+            <Button className="w-full" onClick={() => void tryClaim(token)}>
+              Try again
+            </Button>
+          )}
+          {!claiming && !error && token && (
+            <Button className="w-full" onClick={() => void tryClaim(token)}>
+              Link my profile
+            </Button>
+          )}
         </CardContent>
       </Card>
     </div>
   )
 }
-

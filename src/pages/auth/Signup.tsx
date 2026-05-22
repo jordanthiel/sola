@@ -1,29 +1,46 @@
 import { useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
+import {
+  accountKindFromRedirect,
+  authRedirectQuery,
+  getPostAuthRedirect,
+  postAuthDestination,
+} from '@/lib/auth-redirect'
+import { claimPathWithToken, getPersistedClaimToken } from '@/lib/claim-link'
+import { AuthLayout } from '@/components/layout/AuthLayout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 
 export function SignupPage() {
   const { signUp, user } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const redirectPath = getPostAuthRedirect(searchParams)
+  const signupAccountKind = accountKindFromRedirect(redirectPath)
+  const afterAuth =
+    signupAccountKind === 'nanny'
+      ? redirectPath ?? claimPathWithToken(getPersistedClaimToken())
+      : postAuthDestination(searchParams, '/onboarding')
+  const redirectQuery = redirectPath ? `?${authRedirectQuery(redirectPath)}` : ''
+
   const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  if (user) return <Navigate to="/" replace />
+  if (user) return <Navigate to={afterAuth} replace />
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
     setLoading(true)
     try {
-      await signUp(email, password, displayName)
-      navigate('/onboarding')
+      await signUp(email, password, displayName, signupAccountKind)
+      navigate(afterAuth, { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign up failed')
     } finally {
@@ -32,13 +49,16 @@ export function SignupPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>Create account</CardTitle>
-          <CardDescription>Start managing your nanny household</CardDescription>
-        </CardHeader>
-        <CardContent>
+    <AuthLayout
+      title="Create your account"
+      subtitle={
+        redirectPath
+          ? 'Create an account to accept your invitation'
+          : 'Start managing your nanny household in minutes'
+      }
+    >
+      <Card>
+        <CardContent className="pt-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name">Your name</Label>
@@ -59,19 +79,24 @@ export function SignupPage() {
                 required
               />
             </div>
-            {error && <p className="text-sm text-red-600">{error}</p>}
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Creating...' : 'Sign up'}
+            {error && (
+              <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-700">{error}</p>
+            )}
+            <Button type="submit" className="w-full" size="lg" disabled={loading}>
+              {loading ? 'Creating...' : redirectPath ? 'Create account & continue' : 'Get started'}
             </Button>
           </form>
-          <p className="mt-4 text-center text-sm text-[var(--color-muted-foreground)]">
+          <p className="mt-6 text-center text-sm text-[var(--color-muted-foreground)]">
             Already have an account?{' '}
-            <Link to="/login" className="text-[var(--color-primary)] hover:underline">
+            <Link
+              to={`/login${redirectQuery}`}
+              className="font-semibold text-[var(--color-primary)] hover:underline"
+            >
               Sign in
             </Link>
           </p>
         </CardContent>
       </Card>
-    </div>
+    </AuthLayout>
   )
 }

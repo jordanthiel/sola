@@ -7,9 +7,10 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
+import { fetchMyHouseholds } from '@/lib/household-membership'
 import type { Household, HouseholdMember, MemberRole } from '@/types/database'
+import { isNannyAccount } from '@/types/account'
 
 const STORAGE_KEY = 'nanny_active_household'
 
@@ -21,6 +22,7 @@ interface HouseholdContextValue {
   isParent: boolean
   isNanny: boolean
   loading: boolean
+  hasHouseholdAccess: boolean
   setActiveHouseholdId: (id: string) => void
   refreshHouseholds: () => Promise<void>
 }
@@ -28,7 +30,7 @@ interface HouseholdContextValue {
 const HouseholdContext = createContext<HouseholdContextValue | null>(null)
 
 export function HouseholdProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth()
+  const { user, accountKind, sessionContext } = useAuth()
   const [households, setHouseholds] = useState<Household[]>([])
   const [memberships, setMemberships] = useState<HouseholdMember[]>([])
   const [activeId, setActiveId] = useState<string | null>(
@@ -44,45 +46,35 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    const { data: members } = await supabase
-      .from('household_members')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('status', 'active')
+    setLoading(true)
 
-    if (!members?.length) {
+    try {
+      const { households: hh, memberships: memberRows } = await fetchMyHouseholds(user.id)
+      setHouseholds(hh)
+      setMemberships(memberRows)
+
+      const validIds = new Set(hh.map((h) => h.id))
+      const sessionHouseholdId = sessionContext?.household_id ?? null
+
+      setActiveId((prev) => {
+        if (prev && validIds.has(prev)) return prev
+        if (sessionHouseholdId && validIds.has(sessionHouseholdId)) return sessionHouseholdId
+        const next = hh[0]?.id ?? sessionHouseholdId ?? null
+        if (next) localStorage.setItem(STORAGE_KEY, next)
+        else localStorage.removeItem(STORAGE_KEY)
+        return next
+      })
+    } catch (err) {
+      console.warn('Failed to load households:', err)
       setHouseholds([])
       setMemberships([])
+    } finally {
       setLoading(false)
-      return
     }
-
-    const ids = members.map((m) => m.household_id)
-    const { data: hh } = await supabase.from('households').select('*').in('id', ids)
-
-    setMemberships(members)
-    setHouseholds(hh ?? [])
-
-    const validIds = new Set((hh ?? []).map((h) => h.id))
-    setActiveId((prev) => {
-      if (prev && validIds.has(prev)) {
-        return prev
-      }
-      const next = hh?.[0]?.id ?? null
-      if (next) {
-        localStorage.setItem(STORAGE_KEY, next)
-      } else {
-        localStorage.removeItem(STORAGE_KEY)
-      }
-      return next
-    })
-
-    setLoading(false)
-  }, [user])
+  }, [user, sessionContext?.household_id])
 
   useEffect(() => {
-    setLoading(true)
-    refreshHouseholds()
+    void refreshHouseholds()
   }, [refreshHouseholds])
 
   const setActiveHouseholdId = useCallback((id: string) => {
@@ -92,10 +84,18 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
 
   const activeHousehold = households.find((h) => h.id === activeId) ?? households[0] ?? null
   const membership =
-    memberships.find((m) => m.household_id === (activeHousehold?.id ?? activeId)) ?? null
-  const role = membership?.role ?? null
+    memberships.find((m) => m.household_id === (activeHousehold?.id ?? activeId)) ??
+    memberships[0] ??
+    null
+
+  const roleFromSession = sessionContext?.member_role ?? null
+  const role = membership?.role ?? roleFromSession
   const isParent = role === 'owner' || role === 'parent'
-  const isNanny = role === 'nanny'
+  const isNanny = isNannyAccount(accountKind) || role === 'nanny'
+  const hasHouseholdAccess =
+    households.length > 0 ||
+    memberships.length > 0 ||
+    sessionContext?.has_household_access === true
 
   const value = useMemo(
     () => ({
@@ -106,6 +106,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       isParent,
       isNanny,
       loading,
+      hasHouseholdAccess,
       setActiveHouseholdId,
       refreshHouseholds,
     }),
@@ -117,6 +118,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       isParent,
       isNanny,
       loading,
+      hasHouseholdAccess,
       setActiveHouseholdId,
       refreshHouseholds,
     ],

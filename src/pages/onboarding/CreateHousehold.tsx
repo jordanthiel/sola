@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useHousehold } from '@/contexts/HouseholdContext'
 import { formatSupabaseError } from '@/lib/errors'
+import { isNannyAccount } from '@/types/account'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -21,40 +22,32 @@ const TIMEZONES = [
 ]
 
 export function CreateHouseholdPage() {
-  const { user } = useAuth()
-  const { refreshHouseholds, activeHousehold, households, loading: householdLoading, setActiveHouseholdId } =
-    useHousehold()
+  const { accountKind, sessionContext, loading: authLoading, refreshSession } = useAuth()
+  const { refreshHouseholds, setActiveHouseholdId } = useHousehold()
   const navigate = useNavigate()
   const [name, setName] = useState('')
   const [timezone, setTimezone] = useState('America/New_York')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    refreshHouseholds()
-  }, [refreshHouseholds])
+  if (!authLoading && isNannyAccount(accountKind)) {
+    return <Navigate to="/" replace />
+  }
 
   useEffect(() => {
-    if (!householdLoading && activeHousehold) {
+    if (sessionContext?.has_household_access) {
       navigate('/', { replace: true })
     }
-  }, [activeHousehold, householdLoading, navigate])
+  }, [sessionContext?.has_household_access, navigate])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!user || loading) return
+    if (loading) return
 
     setLoading(true)
     setError('')
 
     try {
-      // If context already has households (e.g. after a successful create), go home
-      if (households.length > 0) {
-        setActiveHouseholdId(households[0].id)
-        navigate('/', { replace: true })
-        return
-      }
-
       const { data: householdId, error: rpcError } = await supabase.rpc('create_household_with_owner', {
         p_name: name.trim(),
         p_timezone: timezone,
@@ -67,6 +60,7 @@ export function CreateHouseholdPage() {
       }
 
       await refreshHouseholds()
+      await refreshSession()
       navigate('/', { replace: true })
     } catch (err) {
       console.error('create_household_with_owner failed:', err)
@@ -76,7 +70,7 @@ export function CreateHouseholdPage() {
     }
   }
 
-  if (householdLoading) {
+  if (authLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <p className="text-[var(--color-muted-foreground)]">Loading...</p>
@@ -89,7 +83,10 @@ export function CreateHouseholdPage() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Set up your household</CardTitle>
-          <CardDescription>Create a space to manage schedules, hours, and payroll.</CardDescription>
+          <CardDescription>
+            For parents and guardians — create your family&apos;s space to manage schedules, hours, and
+            payroll.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">

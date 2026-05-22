@@ -5,6 +5,7 @@ import { queryClient } from '@/lib/query-client'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { HouseholdProvider } from '@/contexts/HouseholdContext'
 import { RequireAuth } from '@/components/routes/RequireAuth'
+import { RequireAccountSetup } from '@/components/routes/RequireAccountSetup'
 import { RequireHousehold } from '@/components/routes/RequireHousehold'
 import { AppShell } from '@/components/layout/AppShell'
 import { LoginPage } from '@/pages/auth/Login'
@@ -19,6 +20,10 @@ import { TimeOffPage } from '@/pages/time-off/TimeOffPage'
 import { ChildrenPage } from '@/pages/children/ChildrenPage'
 import { ActivitiesPage } from '@/pages/activities/ActivitiesPage'
 import { SettingsPage } from '@/pages/settings/SettingsPage'
+import { NannyPage } from '@/pages/settings/NannyPage'
+import { DocumentsPage } from '@/pages/documents/DocumentsPage'
+import { FeedPage } from '@/pages/feed/FeedPage'
+import { IncidentsPage } from '@/pages/incidents/IncidentsPage'
 
 export default function App() {
   return (
@@ -33,17 +38,23 @@ export default function App() {
               <Route path="/claim" element={<ClaimNannyPage />} />
 
               <Route element={<RequireAuth />}>
-                <Route path="/onboarding" element={<CreateHouseholdPage />} />
-                <Route element={<RequireHousehold />}>
-                  <Route element={<AppShell />}>
-                    <Route index element={<DashboardPage />} />
-                    <Route path="schedule" element={<SchedulePage />} />
-                    <Route path="hours" element={<Navigate to="/schedule" replace />} />
-                    <Route path="payroll" element={<PayrollPage />} />
-                    <Route path="time-off" element={<TimeOffPage />} />
-                    <Route path="children" element={<ChildrenPage />} />
-                    <Route path="activities" element={<ActivitiesPage />} />
-                    <Route path="settings" element={<SettingsPage />} />
+                <Route element={<RequireAccountSetup />}>
+                  <Route path="/onboarding" element={<CreateHouseholdPage />} />
+                  <Route element={<RequireHousehold />}>
+                    <Route element={<AppShell />}>
+                      <Route index element={<DashboardPage />} />
+                      <Route path="schedule" element={<SchedulePage />} />
+                      <Route path="hours" element={<Navigate to="/schedule" replace />} />
+                      <Route path="payroll" element={<PayrollPage />} />
+                      <Route path="time-off" element={<TimeOffPage />} />
+                      <Route path="children" element={<ChildrenPage />} />
+                      <Route path="activities" element={<ActivitiesPage />} />
+                      <Route path="documents" element={<DocumentsPage />} />
+                      <Route path="feed" element={<FeedPage />} />
+                      <Route path="incidents" element={<IncidentsPage />} />
+                      <Route path="settings" element={<SettingsPage />} />
+                      <Route path="settings/nannies/:nannyId" element={<NannyPage />} />
+                    </Route>
                   </Route>
                 </Route>
               </Route>

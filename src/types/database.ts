@@ -1,14 +1,27 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
+export type AccountKind = 'unset' | 'family' | 'nanny'
 export type MemberRole = 'owner' | 'parent' | 'nanny'
-export type MemberStatus = 'active' | 'invited'
+export type MemberStatus = 'active' | 'invited' | 'inactive'
 export type ScheduleStatus = 'scheduled' | 'cancelled'
 export type TimeEntrySource = 'manual' | 'clock'
 export type PayPeriodType = 'weekly' | 'biweekly' | 'monthly'
+export type PayReportingMode = 'all_over' | 'all_under' | 'split' | 'regular_over_ot_under'
 export type AdvanceStatus = 'open' | 'applied' | 'void'
+export type AdvanceRepaymentMode = 'per_paycheck' | 'overtime_only'
 export type TimeOffType = 'sick' | 'pto' | 'unpaid'
 export type TimeOffStatus = 'pending' | 'approved' | 'denied'
-export type ActivityType = 'meal' | 'nap' | 'outdoor' | 'learning' | 'appointment' | 'other'
+export type ActivityType =
+  | 'meal'
+  | 'nap'
+  | 'outdoor'
+  | 'learning'
+  | 'appointment'
+  | 'gymnastics'
+  | 'library'
+  | 'class'
+  | 'playdate'
+  | 'other'
 export type MoodType = 'happy' | 'calm' | 'fussy' | 'tired' | 'sick'
 
 export interface Database {
@@ -19,6 +32,7 @@ export interface Database {
           id: string
           display_name: string | null
           avatar_url: string | null
+          account_kind: AccountKind
           notifications_read_at: string | null
           created_at: string
           updated_at: string
@@ -27,6 +41,7 @@ export interface Database {
           id: string
           display_name?: string | null
           avatar_url?: string | null
+          account_kind?: AccountKind
           notifications_read_at?: string | null
           created_at?: string
           updated_at?: string
@@ -35,6 +50,7 @@ export interface Database {
           id?: string
           display_name?: string | null
           avatar_url?: string | null
+          account_kind?: AccountKind
           notifications_read_at?: string | null
           created_at?: string
           updated_at?: string
@@ -107,7 +123,11 @@ export interface Database {
           user_id: string | null
           claim_token: string | null
           claim_token_expires_at: string | null
+          claim_invite_sent_at: string | null
+          claim_invite_sent_by: string | null
           claimed_at: string | null
+          deactivated_at: string | null
+          deactivated_by: string | null
           created_at: string
           updated_at: string
         }
@@ -122,7 +142,11 @@ export interface Database {
           user_id?: string | null
           claim_token?: string | null
           claim_token_expires_at?: string | null
+          claim_invite_sent_at?: string | null
+          claim_invite_sent_by?: string | null
           claimed_at?: string | null
+          deactivated_at?: string | null
+          deactivated_by?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -137,7 +161,11 @@ export interface Database {
           user_id?: string | null
           claim_token?: string | null
           claim_token_expires_at?: string | null
+          claim_invite_sent_at?: string | null
+          claim_invite_sent_by?: string | null
           claimed_at?: string | null
+          deactivated_at?: string | null
+          deactivated_by?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -179,6 +207,30 @@ export interface Database {
         }
         Relationships: []
       }
+      household_holidays: {
+        Row: {
+          household_id: string
+          holiday_key: string
+          enabled: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          household_id: string
+          holiday_key: string
+          enabled: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          household_id?: string
+          holiday_key?: string
+          enabled?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       employment_settings: {
         Row: {
           id: string
@@ -190,6 +242,11 @@ export interface Database {
           standard_hours_per_week: number
           pay_period: PayPeriodType
           effective_from: string
+          employment_type: string
+          tax_withholding_notes: string | null
+          pay_reporting_mode: PayReportingMode
+          over_table_percent: number
+          auto_record_advance_repayments: boolean
           created_at: string
           updated_at: string
         }
@@ -203,6 +260,11 @@ export interface Database {
           standard_hours_per_week?: number
           pay_period?: PayPeriodType
           effective_from?: string
+          employment_type?: string
+          tax_withholding_notes?: string | null
+          pay_reporting_mode?: PayReportingMode
+          over_table_percent?: number
+          auto_record_advance_repayments?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -215,6 +277,11 @@ export interface Database {
           standard_hours_per_week?: number
           pay_period?: PayPeriodType
           effective_from?: string
+          employment_type?: string
+          tax_withholding_notes?: string | null
+          pay_reporting_mode?: PayReportingMode
+          over_table_percent?: number
+          auto_record_advance_repayments?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -225,8 +292,12 @@ export interface Database {
           id: string
           household_id: string
           name: string
+          color_key: string
           date_of_birth: string | null
           notes: string | null
+          allergies: string | null
+          medications: string | null
+          routines: string | null
           created_at: string
           updated_at: string
         }
@@ -234,8 +305,12 @@ export interface Database {
           id?: string
           household_id: string
           name: string
+          color_key?: string
           date_of_birth?: string | null
           notes?: string | null
+          allergies?: string | null
+          medications?: string | null
+          routines?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -243,8 +318,12 @@ export interface Database {
           id?: string
           household_id?: string
           name?: string
+          color_key?: string
           date_of_birth?: string | null
           notes?: string | null
+          allergies?: string | null
+          medications?: string | null
+          routines?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -416,6 +495,42 @@ export interface Database {
         }
         Relationships: []
       }
+      advance_repayments: {
+        Row: {
+          id: string
+          payment_advance_id: string
+          household_id: string
+          amount_cents: number
+          paid_on: string
+          source: 'payroll' | 'manual' | 'backfill'
+          pay_period_start: string | null
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          payment_advance_id: string
+          household_id: string
+          amount_cents: number
+          paid_on?: string
+          source: 'payroll' | 'manual' | 'backfill'
+          pay_period_start?: string | null
+          notes?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          payment_advance_id?: string
+          household_id?: string
+          amount_cents?: number
+          paid_on?: string
+          source?: 'payroll' | 'manual' | 'backfill'
+          pay_period_start?: string | null
+          notes?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       payment_advances: {
         Row: {
           id: string
@@ -423,8 +538,11 @@ export interface Database {
           household_nanny_id: string | null
           nanny_user_id: string | null
           amount_cents: number
+          balance_cents: number
           issued_on: string
           reason: string | null
+          repayment_mode: AdvanceRepaymentMode
+          repayment_per_paycheck_cents: number | null
           status: AdvanceStatus
           applied_pay_period_start: string | null
           created_at: string
@@ -436,8 +554,11 @@ export interface Database {
           household_nanny_id: string
           nanny_user_id?: string | null
           amount_cents: number
+          balance_cents?: number
           issued_on?: string
           reason?: string | null
+          repayment_mode?: AdvanceRepaymentMode
+          repayment_per_paycheck_cents?: number | null
           status?: AdvanceStatus
           applied_pay_period_start?: string | null
           created_at?: string
@@ -448,8 +569,11 @@ export interface Database {
           household_id?: string
           nanny_user_id?: string
           amount_cents?: number
+          balance_cents?: number
           issued_on?: string
           reason?: string | null
+          repayment_mode?: AdvanceRepaymentMode
+          repayment_per_paycheck_cents?: number | null
           status?: AdvanceStatus
           applied_pay_period_start?: string | null
           created_at?: string
@@ -469,6 +593,7 @@ export interface Database {
           hours: number
           status: TimeOffStatus
           notes: string | null
+          review_notes: string | null
           reviewed_by: string | null
           reviewed_at: string | null
           created_at: string
@@ -485,6 +610,7 @@ export interface Database {
           hours: number
           status?: TimeOffStatus
           notes?: string | null
+          review_notes?: string | null
           reviewed_by?: string | null
           reviewed_at?: string | null
           created_at?: string
@@ -500,6 +626,7 @@ export interface Database {
           hours?: number
           status?: TimeOffStatus
           notes?: string | null
+          review_notes?: string | null
           reviewed_by?: string | null
           reviewed_at?: string | null
           created_at?: string
@@ -522,7 +649,8 @@ export interface Database {
         Insert: {
           id?: string
           household_id: string
-          nanny_user_id: string
+          household_nanny_id: string
+          nanny_user_id?: string | null
           sick_hours_accrued?: number
           pto_hours_accrued?: number
           sick_hours_used?: number
@@ -532,7 +660,8 @@ export interface Database {
         Update: {
           id?: string
           household_id?: string
-          nanny_user_id?: string
+          household_nanny_id?: string
+          nanny_user_id?: string | null
           sick_hours_accrued?: number
           pto_hours_accrued?: number
           sick_hours_used?: number
@@ -553,6 +682,10 @@ export interface Database {
           occurred_at: string
           duration_minutes: number | null
           mood: MoodType | null
+          plan_group_id: string | null
+          recurring_plan_id: string | null
+          attendee_user_id: string | null
+          attendee_household_nanny_id: string | null
           created_at: string
           updated_at: string
         }
@@ -567,6 +700,10 @@ export interface Database {
           occurred_at?: string
           duration_minutes?: number | null
           mood?: MoodType | null
+          plan_group_id?: string | null
+          recurring_plan_id?: string | null
+          attendee_user_id?: string | null
+          attendee_household_nanny_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -581,9 +718,19 @@ export interface Database {
           occurred_at?: string
           duration_minutes?: number | null
           mood?: MoodType | null
+          plan_group_id?: string | null
+          recurring_plan_id?: string | null
+          attendee_user_id?: string | null
+          attendee_household_nanny_id?: string | null
           created_at?: string
           updated_at?: string
         }
+        Relationships: []
+      }
+      child_activity_children: {
+        Row: { activity_id: string; child_id: string }
+        Insert: { activity_id: string; child_id: string }
+        Update: { activity_id?: string; child_id?: string }
         Relationships: []
       }
       documents: {
@@ -592,25 +739,292 @@ export interface Database {
           household_id: string
           title: string
           storage_path: string
+          category: string
+          mime_type: string | null
+          file_size: number | null
+          household_nanny_id: string | null
           uploaded_by: string | null
           created_at: string
+          updated_at: string
         }
         Insert: {
           id?: string
           household_id: string
           title: string
           storage_path: string
+          category?: string
+          mime_type?: string | null
+          file_size?: number | null
+          household_nanny_id?: string | null
           uploaded_by?: string | null
           created_at?: string
+          updated_at?: string
         }
         Update: {
           id?: string
           household_id?: string
           title?: string
           storage_path?: string
+          category?: string
+          mime_type?: string | null
+          file_size?: number | null
+          household_nanny_id?: string | null
           uploaded_by?: string | null
           created_at?: string
+          updated_at?: string
         }
+        Relationships: []
+      }
+      recurring_child_plans: {
+        Row: {
+          id: string
+          household_id: string
+          title: string
+          activity_type: ActivityType
+          description: string | null
+          day_of_week: number
+          start_time: string
+          duration_minutes: number
+          child_ids: string[]
+          enabled: boolean
+          repeat_starts_on: string | null
+          repeat_ends_on: string | null
+          last_generated_through: string | null
+          created_by: string | null
+          attendee_user_id: string | null
+          attendee_household_nanny_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          household_id: string
+          title: string
+          activity_type?: ActivityType
+          description?: string | null
+          day_of_week: number
+          start_time: string
+          duration_minutes?: number
+          child_ids: string[]
+          enabled?: boolean
+          repeat_starts_on?: string | null
+          repeat_ends_on?: string | null
+          created_by?: string | null
+          attendee_user_id?: string | null
+          attendee_household_nanny_id?: string | null
+        }
+        Update: {
+          enabled?: boolean
+          repeat_starts_on?: string | null
+          repeat_ends_on?: string | null
+          last_generated_through?: string | null
+          attendee_user_id?: string | null
+          attendee_household_nanny_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      child_emergency_contacts: {
+        Row: {
+          id: string
+          child_id: string
+          name: string
+          relationship: string | null
+          phone: string | null
+          email: string | null
+          is_authorized_pickup: boolean
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          child_id: string
+          name: string
+          relationship?: string | null
+          phone?: string | null
+          email?: string | null
+          is_authorized_pickup?: boolean
+          notes?: string | null
+        }
+        Update: Partial<{
+          name: string
+          relationship: string | null
+          phone: string | null
+          email: string | null
+          is_authorized_pickup: boolean
+          notes: string | null
+        }>
+        Relationships: []
+      }
+      incidents: {
+        Row: {
+          id: string
+          household_id: string
+          child_id: string | null
+          reported_by: string
+          occurred_at: string
+          severity: string
+          title: string
+          description: string
+          follow_up: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          household_id: string
+          child_id?: string | null
+          reported_by: string
+          occurred_at?: string
+          severity?: string
+          title: string
+          description: string
+          follow_up?: string | null
+        }
+        Update: Partial<{
+          follow_up: string | null
+        }>
+        Relationships: []
+      }
+      payroll_line_items: {
+        Row: {
+          id: string
+          household_id: string
+          household_nanny_id: string
+          pay_period_start: string
+          item_type: string
+          amount_cents: number
+          description: string | null
+          miles: number | null
+          rate_per_mile_cents: number | null
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          household_id: string
+          household_nanny_id: string
+          pay_period_start: string
+          item_type: string
+          amount_cents: number
+          description?: string | null
+          miles?: number | null
+          rate_per_mile_cents?: number | null
+          created_by?: string | null
+        }
+        Update: never
+        Relationships: []
+      }
+      pay_period_closes: {
+        Row: {
+          id: string
+          household_id: string
+          household_nanny_id: string
+          period_start: string
+          period_end: string
+          hours_basis: string
+          closed_at: string
+          closed_by: string | null
+          snapshot: Json
+          paid_at: string | null
+          paid_amount_cents: number | null
+          notes: string | null
+        }
+        Insert: {
+          id?: string
+          household_id: string
+          household_nanny_id: string
+          period_start: string
+          period_end: string
+          hours_basis: string
+          closed_by?: string | null
+          snapshot: Json
+          paid_at?: string | null
+          paid_amount_cents?: number | null
+          notes?: string | null
+        }
+        Update: Partial<{
+          paid_at: string | null
+          paid_amount_cents: number | null
+          notes: string | null
+        }>
+        Relationships: []
+      }
+      notification_preferences: {
+        Row: {
+          user_id: string
+          household_id: string
+          email_enabled: boolean
+          in_app_enabled: boolean
+          categories: Json
+          updated_at: string
+        }
+        Insert: {
+          user_id: string
+          household_id: string
+          email_enabled?: boolean
+          in_app_enabled?: boolean
+          categories?: Json
+          updated_at?: string
+        }
+        Update: Partial<{
+          email_enabled: boolean
+          in_app_enabled: boolean
+          categories: Json
+          updated_at: string
+        }>
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          id: string
+          household_id: string
+          user_id: string
+          category: string
+          title: string
+          body: string | null
+          link: string | null
+          metadata: Json | null
+          read_at: string | null
+          email_sent_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          household_id: string
+          user_id: string
+          category: string
+          title: string
+          body?: string | null
+          link?: string | null
+          metadata?: Json | null
+        }
+        Update: Partial<{ read_at: string | null; email_sent_at: string | null }>
+        Relationships: []
+      }
+      feed_posts: {
+        Row: {
+          id: string
+          household_id: string
+          author_id: string
+          body: string
+          is_urgent: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          household_id: string
+          author_id: string
+          body: string
+          is_urgent?: boolean
+        }
+        Update: Partial<{ body: string; is_urgent: boolean }>
+        Relationships: []
+      }
+      feed_mentions: {
+        Row: { post_id: string; mentioned_user_id: string }
+        Insert: { post_id: string; mentioned_user_id: string }
+        Update: never
         Relationships: []
       }
     }
@@ -626,6 +1040,10 @@ export interface Database {
       }
       create_nanny_invite: {
         Args: { p_household_id: string; p_email: string }
+        Returns: string
+      }
+      create_household_member_invite: {
+        Args: { p_household_id: string; p_email: string; p_role?: 'owner' | 'parent' | 'nanny' }
         Returns: string
       }
       add_nanny_by_email: {
@@ -647,9 +1065,43 @@ export interface Database {
         Args: { p_household_nanny_id: string }
         Returns: string
       }
+      record_nanny_claim_invite_sent: {
+        Args: { p_household_nanny_id: string }
+        Returns: undefined
+      }
+      update_unclaimed_nanny_email: {
+        Args: { p_household_nanny_id: string; p_email: string }
+        Returns: undefined
+      }
+      deactivate_household_nanny: {
+        Args: { p_household_nanny_id: string }
+        Returns: undefined
+      }
       claim_nanny_profile: {
         Args: { p_claim_token: string }
         Returns: string
+      }
+      list_my_households: {
+        Args: Record<string, never>
+        Returns: {
+          id: string
+          name: string
+          timezone: string
+          created_by: string | null
+          created_at: string
+          updated_at: string
+          member_role: MemberRole
+        }[]
+      }
+      get_my_session_context: {
+        Args: Record<string, never>
+        Returns: {
+          account_kind: AccountKind
+          household_id: string | null
+          household_name: string | null
+          member_role: MemberRole | null
+          has_household_access: boolean
+        }[]
       }
       ensure_schedule_from_templates: {
         Args: {
@@ -678,6 +1130,42 @@ export interface Database {
         }
         Returns: string
       }
+      record_advance_repayments: {
+        Args: {
+          p_household_id: string
+          p_period_start: string
+          p_repayments: { advance_id: string; amount_cents: number }[]
+        }
+        Returns: number
+      }
+      apply_advance_payment: {
+        Args: {
+          p_advance_id: string
+          p_amount_cents: number
+          p_paid_on: string
+          p_source: 'payroll' | 'manual' | 'backfill'
+          p_pay_period_start?: string | null
+          p_notes?: string | null
+        }
+        Returns: string
+      }
+      create_household_notification: {
+        Args: {
+          p_household_id: string
+          p_category: string
+          p_title: string
+          p_body?: string | null
+          p_link?: string | null
+          p_metadata?: Json | null
+          p_exclude_user_id?: string | null
+          p_target_user_ids?: string[] | null
+        }
+        Returns: void
+      }
+      generate_recurring_child_plans: {
+        Args: { p_household_id: string; p_through_date?: string }
+        Returns: number
+      }
     }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>
@@ -688,6 +1176,7 @@ export type Profile = Database['public']['Tables']['profiles']['Row']
 export type Household = Database['public']['Tables']['households']['Row']
 export type HouseholdMember = Database['public']['Tables']['household_members']['Row']
 export type HouseholdInvite = Database['public']['Tables']['household_invites']['Row']
+export type HouseholdHoliday = Database['public']['Tables']['household_holidays']['Row']
 export type EmploymentSetting = Database['public']['Tables']['employment_settings']['Row']
 export type Child = Database['public']['Tables']['children']['Row']
 export type ScheduleBlock = Database['public']['Tables']['schedule_blocks']['Row']

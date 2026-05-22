@@ -4,8 +4,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { formatSupabaseError } from '@/lib/errors'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { TimePicker } from '@/components/ui/time-picker'
 import { Textarea } from '@/components/ui/textarea'
 import type { ReportLateTarget } from '@/types/schedule-day'
 
@@ -66,7 +66,7 @@ export function ReportLateDialog({ target, onClose }: ReportLateDialogProps) {
         <div className="mt-4 space-y-4">
           <div className="space-y-2">
             <Label>Actual end time</Label>
-            <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+            <TimePicker value={endTime} onChange={setEndTime} />
           </div>
           <div className="space-y-2">
             <Label>Notes (optional)</Label>
