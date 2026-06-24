@@ -25,6 +25,7 @@ import { NannyPage } from '@/pages/settings/NannyPage'
 import { DocumentsPage } from '@/pages/documents/DocumentsPage'
 import { FeedPage } from '@/pages/feed/FeedPage'
 import { IncidentsPage } from '@/pages/incidents/IncidentsPage'
+import { AdvanceDetailPage } from '@/pages/advances/AdvanceDetailPage'
 
 export default function App() {
   return (
@@ -47,6 +48,7 @@ export default function App() {
                       <Route path="schedule" element={<SchedulePage />} />
                       <Route path="hours" element={<Navigate to="/schedule" replace />} />
                       <Route path="payroll" element={<PayrollPage />} />
+                      <Route path="payroll/advances/:advanceId" element={<AdvanceDetailPage />} />
                       <Route path="time-off" element={<TimeOffPage />} />
                       <Route path="children" element={<ChildrenPage />} />
                       <Route path="activities" element={<ActivitiesPage />} />

@@ -9,6 +9,7 @@ import {
   Palmtree,
   Wallet,
 } from 'lucide-react'
+import { NannyAdvanceDashboardCard } from '@/components/advances/NannyAdvanceDashboardCard'
 import { useAuth } from '@/contexts/AuthContext'
 import { useHousehold } from '@/contexts/HouseholdContext'
 import {
@@ -122,6 +123,8 @@ export function NannyDashboard() {
             : activeHousehold?.name
         }
       />
+
+      <NannyAdvanceDashboardCard householdNannyId={myNanny?.id} />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card className={cn('stat-card stat-card-highlight')}>

@@ -1,4 +1,4 @@
-import { format, parseISO } from 'date-fns'
+import { addDays, format, parseISO } from 'date-fns'
 import type { AdvanceRepaymentMode, PayPeriodType, PaymentAdvance } from '@/types/database'
 import type { AdvanceRepayment } from '@/types/advance-repayment'
 import { getPayPeriodBounds } from '@/lib/pay-period'
@@ -176,4 +176,83 @@ export function buildPayPeriodHistoryRows(
   }
 
   return [...map.values()].sort((a, b) => b.periodStart.localeCompare(a.periodStart))
+}
+
+export function advancePaidCents(advance: PaymentAdvance): number {
+  return advance.amount_cents - advance.balance_cents
+}
+
+export interface AdvancePayoffEstimate {
+  paidCents: number
+  balanceCents: number
+  totalCents: number
+  percentPaid: number
+  estimatedPayoffDate: Date | null
+  estimatedPayoffLabel: string
+  paychecksRemaining: number | null
+}
+
+/** End date of the Nth pay period from anchor (N=1 is the period containing anchor). */
+export function endOfNthPayPeriod(payPeriod: PayPeriodType, anchor: Date, n: number): Date {
+  const { end } = getPayPeriodBounds(payPeriod, anchor)
+  if (n <= 1) return end
+  let periodEnd = end
+  for (let i = 1; i < n; i++) {
+    const nextStart = addDays(periodEnd, 1)
+    periodEnd = getPayPeriodBounds(payPeriod, nextStart).end
+  }
+  return periodEnd
+}
+
+export function estimateAdvancePayoff(
+  advance: PaymentAdvance,
+  payPeriod: PayPeriodType,
+  anchor: Date = new Date(),
+): AdvancePayoffEstimate {
+  const paidCents = advancePaidCents(advance)
+  const balanceCents = advance.balance_cents
+  const totalCents = advance.amount_cents
+  const percentPaid = totalCents > 0 ? Math.round((paidCents / totalCents) * 100) : 100
+
+  if (advance.status !== 'open' || balanceCents <= 0) {
+    return {
+      paidCents,
+      balanceCents: 0,
+      totalCents,
+      percentPaid: 100,
+      estimatedPayoffDate: null,
+      estimatedPayoffLabel: 'Paid in full',
+      paychecksRemaining: 0,
+    }
+  }
+
+  if (advance.repayment_mode === 'overtime_only') {
+    return {
+      paidCents,
+      balanceCents,
+      totalCents,
+      percentPaid,
+      estimatedPayoffDate: null,
+      estimatedPayoffLabel: 'Depends on overtime hours each pay period',
+      paychecksRemaining: null,
+    }
+  }
+
+  const installment = advance.repayment_per_paycheck_cents ?? balanceCents
+  const paychecksRemaining = Math.ceil(balanceCents / installment)
+  const estimatedPayoffDate = endOfNthPayPeriod(payPeriod, anchor, paychecksRemaining)
+
+  return {
+    paidCents,
+    balanceCents,
+    totalCents,
+    percentPaid,
+    estimatedPayoffDate,
+    estimatedPayoffLabel: `${paychecksRemaining} paycheck${paychecksRemaining === 1 ? '' : 's'} remaining`,
+    paychecksRemaining,
+  }
+}
+
+export function openAdvances(advances: PaymentAdvance[]): PaymentAdvance[] {
+  return advances.filter((a) => a.status === 'open' && a.balance_cents > 0)
 }

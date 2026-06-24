@@ -15,16 +15,25 @@ import { isNannyAccount } from '@/types/account'
 
 const STORAGE_KEY = 'nanny_active_household'
 
+function nannyPreviewStorageKey(householdId: string) {
+  return `nanny_preview_${householdId}`
+}
+
 interface HouseholdContextValue {
   households: Household[]
   membership: HouseholdMember | null
   activeHousehold: Household | null
   role: MemberRole | null
+  /** True when the signed-in user is a household owner/parent (ignores nanny preview). */
+  isFamilyManager: boolean
   isParent: boolean
   isNanny: boolean
+  isNannyPreview: boolean
+  nannyPreviewId: string | null
   loading: boolean
   hasHouseholdAccess: boolean
   setActiveHouseholdId: (id: string) => void
+  setNannyPreviewId: (id: string | null) => void
   refreshHouseholds: () => Promise<void>
 }
 
@@ -37,6 +46,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
   const [activeId, setActiveId] = useState<string | null>(
     () => localStorage.getItem(STORAGE_KEY),
   )
+  const [nannyPreviewId, setNannyPreviewIdState] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const hasLoadedOnceRef = useRef(false)
 
@@ -89,6 +99,26 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const activeHousehold = households.find((h) => h.id === activeId) ?? households[0] ?? null
+
+  const setNannyPreviewId = useCallback(
+    (id: string | null) => {
+      setNannyPreviewIdState(id)
+      const householdId = activeHousehold?.id
+      if (!householdId) return
+      if (id) sessionStorage.setItem(nannyPreviewStorageKey(householdId), id)
+      else sessionStorage.removeItem(nannyPreviewStorageKey(householdId))
+    },
+    [activeHousehold?.id],
+  )
+
+  useEffect(() => {
+    if (!activeHousehold?.id) {
+      setNannyPreviewIdState(null)
+      return
+    }
+    const stored = sessionStorage.getItem(nannyPreviewStorageKey(activeHousehold.id))
+    setNannyPreviewIdState(stored)
+  }, [activeHousehold?.id])
   const membership =
     memberships.find((m) => m.household_id === (activeHousehold?.id ?? activeId)) ??
     memberships[0] ??
@@ -96,8 +126,11 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
 
   const roleFromSession = sessionContext?.member_role ?? null
   const role = membership?.role ?? roleFromSession
-  const isParent = role === 'owner' || role === 'parent'
-  const isNanny = isNannyAccount(accountKind) || role === 'nanny'
+  const isFamilyManager = role === 'owner' || role === 'parent'
+  const roleIsNanny = isNannyAccount(accountKind) || role === 'nanny'
+  const isNannyPreview = isFamilyManager && nannyPreviewId !== null
+  const isParent = isFamilyManager && !isNannyPreview
+  const isNanny = roleIsNanny || isNannyPreview
   const hasHouseholdAccess =
     households.length > 0 ||
     memberships.length > 0 ||
@@ -109,11 +142,15 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       membership,
       activeHousehold,
       role,
+      isFamilyManager,
       isParent,
       isNanny,
+      isNannyPreview,
+      nannyPreviewId,
       loading,
       hasHouseholdAccess,
       setActiveHouseholdId,
+      setNannyPreviewId,
       refreshHouseholds,
     }),
     [
@@ -121,11 +158,15 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       membership,
       activeHousehold,
       role,
+      isFamilyManager,
       isParent,
       isNanny,
+      isNannyPreview,
+      nannyPreviewId,
       loading,
       hasHouseholdAccess,
       setActiveHouseholdId,
+      setNannyPreviewId,
       refreshHouseholds,
     ],
   )

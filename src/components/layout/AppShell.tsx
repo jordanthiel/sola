@@ -18,6 +18,7 @@ import {
   ChevronDown,
 } from 'lucide-react'
 import { NotificationBell } from '@/components/notifications/NotificationBell'
+import { NannyPreviewBanner, NannyPreviewSwitcher } from '@/components/layout/NannyPreviewControls'
 import { useNotificationDelivery } from '@/hooks/useNotificationDelivery'
 import { useAuth } from '@/contexts/AuthContext'
 import { useHousehold } from '@/contexts/HouseholdContext'
@@ -188,7 +189,7 @@ function HouseholdSelect({
 export function AppShell() {
   useNotificationDelivery()
   const { profile, signOut, accountKind } = useAuth()
-  const { isParent, isNanny, activeHousehold } = useHousehold()
+  const { isParent, isNanny, isNannyPreview, activeHousehold } = useHousehold()
   const { isDeactivated, isLoading: nannyAccessLoading } = useMyNannyAccess()
   const location = useLocation()
   const navGroups =
@@ -199,11 +200,13 @@ export function AppShell() {
         : nannyNavGroups
   const roleLabel = isDeactivated
     ? 'Former nanny'
-    : isNanny
-      ? 'Nanny'
-      : isFamilyAccount(accountKind)
-        ? 'Family'
-        : accountKindLabel(accountKind)
+    : isNannyPreview
+      ? 'Previewing nanny view'
+      : isNanny
+        ? 'Nanny'
+        : isFamilyAccount(accountKind)
+          ? 'Family'
+          : accountKindLabel(accountKind)
   const [mobileOpen, setMobileOpen] = useState(false)
 
   if (isDeactivated && !isDeactivatedNannyAllowedPath(location.pathname)) {
@@ -237,6 +240,9 @@ export function AppShell() {
         <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
           <NavItems groups={navGroups} />
         </nav>
+        <div className="shrink-0 border-t border-[var(--color-sidebar-border)] px-4 py-3">
+          <NannyPreviewSwitcher />
+        </div>
         <div className="mt-auto shrink-0 border-t border-[var(--color-sidebar-border)] p-4">
           <div className="flex items-center gap-3 rounded-xl bg-[var(--color-muted)]/60 px-3 py-2.5">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] text-xs font-bold text-[var(--color-primary-foreground)]">
@@ -295,6 +301,9 @@ export function AppShell() {
             <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
               <NavItems groups={navGroups} onNavigate={() => setMobileOpen(false)} />
             </nav>
+            <div className="shrink-0 border-t px-4 py-3">
+              <NannyPreviewSwitcher compact />
+            </div>
             <div className="mt-auto shrink-0 border-t p-4">
               <div className="mb-2 flex items-center gap-3 rounded-xl bg-[var(--color-muted)]/60 px-3 py-2.5">
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] text-xs font-bold text-[var(--color-primary-foreground)]">
@@ -322,6 +331,7 @@ export function AppShell() {
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
+        <NannyPreviewBanner />
         {isDeactivated && !nannyAccessLoading && (
           <div className="border-b border-amber-200/80 bg-amber-50 px-4 py-3 text-sm text-amber-950 md:px-6">
             You were deactivated from <strong>{activeHousehold?.name}</strong>. You can review historical pay

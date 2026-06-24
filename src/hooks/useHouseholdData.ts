@@ -49,12 +49,23 @@ export function useNannies() {
 }
 
 export function useMyHouseholdNanny() {
-  const { activeHousehold } = useHousehold()
+  const { activeHousehold, nannyPreviewId, isNannyPreview } = useHousehold()
   const { user } = useAuth()
   return useQuery({
-    queryKey: ['my_household_nanny', activeHousehold?.id, user?.id],
-    enabled: !!activeHousehold && !!user,
+    queryKey: ['my_household_nanny', activeHousehold?.id, user?.id, nannyPreviewId],
+    enabled: !!activeHousehold && (!!user || isNannyPreview),
     queryFn: async () => {
+      if (isNannyPreview && nannyPreviewId) {
+        const { data, error } = await supabase
+          .from('household_nannies')
+          .select('*')
+          .eq('household_id', activeHousehold!.id)
+          .eq('id', nannyPreviewId)
+          .maybeSingle()
+        if (error) throw error
+        return data as HouseholdNanny | null
+      }
+
       const { data, error } = await supabase
         .from('household_nannies')
         .select('*')

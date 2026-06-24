@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ChevronRight, Plus } from 'lucide-react'
+import { ChevronRight, Eye, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
@@ -26,11 +26,13 @@ import { HouseholdHolidaySettings } from '@/components/settings/HouseholdHoliday
 import { HouseholdMembersCard } from '@/components/settings/HouseholdMembersCard'
 import { NotificationSettingsCard } from '@/components/settings/NotificationSettingsCard'
 import { GustoPayrollSetupCard } from '@/components/settings/GustoPayrollSetupCard'
+import { useStartNannyPreview } from '@/components/layout/NannyPreviewControls'
 
 export function SettingsPage() {
   const navigate = useNavigate()
   const { user, profile, refreshProfile } = useAuth()
   const { activeHousehold, isParent } = useHousehold()
+  const startNannyPreview = useStartNannyPreview()
   const { data: nannies, refetch: refetchNannies } = useHouseholdNannies({ includeDeactivated: true })
   const qc = useQueryClient()
 
@@ -125,7 +127,8 @@ export function SettingsPage() {
             <CardHeader>
               <CardTitle className="text-lg">Your nannies</CardTitle>
               <CardDescription>
-                Open a nanny to manage their profile, schedule, pay, and time off
+                Open a nanny to manage their profile, schedule, pay, and time off. Use{' '}
+                <span className="font-medium">View as nanny</span> to see their dashboard.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -136,25 +139,39 @@ export function SettingsPage() {
                     const inviteStatus = getNannyInviteStatus(n)
                     return (
                       <li key={n.id} className={!active ? 'opacity-70' : undefined}>
-                        <Link
-                          to={`/settings/nannies/${n.id}`}
-                          className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-[var(--color-accent)]"
-                        >
-                          <div className="min-w-0">
-                            <p className="font-medium">{nannyDisplayName(n)}</p>
-                            <p className="truncate text-sm text-[var(--color-muted-foreground)]">{n.email}</p>
-                          </div>
-                          <div className="flex shrink-0 items-center gap-2">
-                            {!active ? (
-                              <Badge variant="secondary">Deactivated</Badge>
-                            ) : (
-                              <Badge variant={nannyInviteStatusVariant(inviteStatus)}>
-                                {nannyInviteStatusLabel(inviteStatus)}
-                              </Badge>
-                            )}
-                            <ChevronRight className="h-4 w-4 text-[var(--color-muted-foreground)]" />
-                          </div>
-                        </Link>
+                        <div className="flex items-center gap-2 px-4 py-3">
+                          <Link
+                            to={`/settings/nannies/${n.id}`}
+                            className="flex min-w-0 flex-1 items-center justify-between gap-3 transition-colors hover:opacity-80"
+                          >
+                            <div className="min-w-0">
+                              <p className="font-medium">{nannyDisplayName(n)}</p>
+                              <p className="truncate text-sm text-[var(--color-muted-foreground)]">{n.email}</p>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-2">
+                              {!active ? (
+                                <Badge variant="secondary">Deactivated</Badge>
+                              ) : (
+                                <Badge variant={nannyInviteStatusVariant(inviteStatus)}>
+                                  {nannyInviteStatusLabel(inviteStatus)}
+                                </Badge>
+                              )}
+                              <ChevronRight className="h-4 w-4 text-[var(--color-muted-foreground)]" />
+                            </div>
+                          </Link>
+                          {active && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="shrink-0"
+                              onClick={() => startNannyPreview(n.id)}
+                            >
+                              <Eye className="mr-1.5 h-4 w-4" />
+                              View as nanny
+                            </Button>
+                          )}
+                        </div>
                       </li>
                     )
                   })}
