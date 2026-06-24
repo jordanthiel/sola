@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useHousehold } from '@/contexts/HouseholdContext'
 import { useEmploymentSettings } from '@/hooks/useHouseholdData'
+import { useGustoStatus } from '@/hooks/useGusto'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -14,6 +15,11 @@ export function NannyEmploymentSettings({ householdNannyId }: { householdNannyId
   const { activeHousehold } = useHousehold()
   const qc = useQueryClient()
   const { data: employment } = useEmploymentSettings(householdNannyId)
+  const { data: gustoStatus } = useGustoStatus()
+  const gustoCompany = gustoStatus?.company
+  const gustoPayrollEnabled =
+    !!gustoCompany &&
+    (gustoCompany.onboarding_status === 'approved' || !!gustoCompany.approved_at)
 
   const [hourlyRate, setHourlyRate] = useState('')
   const [otMultiplier, setOtMultiplier] = useState('1.5')
@@ -64,9 +70,14 @@ export function NannyEmploymentSettings({ householdNannyId }: { householdNannyId
         pay_period: payPeriod,
         employment_type: employmentType,
         tax_withholding_notes: taxNotes || null,
-        pay_reporting_mode: payReportingMode,
-        over_table_percent:
-          payReportingMode === 'split' ? pct : payReportingMode === 'all_under' ? 0 : 100,
+        pay_reporting_mode: gustoPayrollEnabled ? 'all_over' : payReportingMode,
+        over_table_percent: gustoPayrollEnabled
+          ? 100
+          : payReportingMode === 'split'
+            ? pct
+            : payReportingMode === 'all_under'
+              ? 0
+              : 100,
         auto_record_advance_repayments: autoRecordAdvanceRepayments,
       }
 
@@ -169,27 +180,32 @@ export function NannyEmploymentSettings({ householdNannyId }: { householdNannyId
         <div>
           <h4 className="font-medium">How pay is reported</h4>
           <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">
-            Choose whether wages are paid on the books (reported for taxes) or off the books (cash /
-            informal). Payroll will split amounts accordingly.
+            {gustoPayrollEnabled
+              ? 'Gusto payroll is enabled for this household — wages must be reported on the books for compliant tax withholding and ACH.'
+              : 'Choose whether wages are paid on the books (reported for taxes) or off the books (cash / informal). Payroll preview will split amounts accordingly.'}
           </p>
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="pay-reporting-mode">Reporting arrangement</Label>
-          <select
-            id="pay-reporting-mode"
-            className={selectCn}
-            value={payReportingMode}
-            onChange={(e) => setPayReportingMode(e.target.value as PayReportingMode)}
-          >
-            <option value="all_over">All pay on the books</option>
-            <option value="all_under">All pay off the books</option>
-            <option value="split">Split — percentage on vs off the books</option>
-            <option value="regular_over_ot_under">
-              Regular wages on the books, overtime off the books
-            </option>
-          </select>
-        </div>
-        {payReportingMode === 'split' && (
+        {gustoPayrollEnabled ? (
+          <p className="text-sm font-medium">All pay on the books (required for Gusto)</p>
+        ) : (
+          <div className="space-y-2">
+            <Label htmlFor="pay-reporting-mode">Reporting arrangement</Label>
+            <select
+              id="pay-reporting-mode"
+              className={selectCn}
+              value={payReportingMode}
+              onChange={(e) => setPayReportingMode(e.target.value as PayReportingMode)}
+            >
+              <option value="all_over">All pay on the books</option>
+              <option value="all_under">All pay off the books</option>
+              <option value="split">Split — percentage on vs off the books</option>
+              <option value="regular_over_ot_under">
+                Regular wages on the books, overtime off the books
+              </option>
+            </select>
+          </div>
+        )}
+        {!gustoPayrollEnabled && payReportingMode === 'split' && (
           <div className="space-y-2">
             <Label htmlFor="over-table-percent">Percent on the books (%)</Label>
             <Input
@@ -207,7 +223,7 @@ export function NannyEmploymentSettings({ householdNannyId }: { householdNannyId
             </p>
           </div>
         )}
-        {payReportingMode === 'regular_over_ot_under' && (
+        {!gustoPayrollEnabled && payReportingMode === 'regular_over_ot_under' && (
           <p className="text-xs text-[var(--color-muted-foreground)]">
             Regular hours are counted on the books; overtime and the OT rate portion are off the
             books. Bonuses and mileage follow regular pay (on the books).

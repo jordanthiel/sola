@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { parseISO, subYears } from 'date-fns'
+import { useMemo, useState } from 'react'
+import { startOfMonth, subYears } from 'date-fns'
 import type { DayPickerProps } from 'react-day-picker'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Calendar } from '@/components/ui/calendar'
@@ -16,13 +16,22 @@ export type DatePickerProps = {
   placeholder?: string
   min?: string
   max?: string
-  /** Month/year dropdowns — use for dates of birth and other far-past dates. */
+  /** Month/year dropdowns for quick navigation. Default: dropdown. */
   captionLayout?: DayPickerProps['captionLayout']
   reverseYears?: boolean
+  /** Years before max when no min is set. Default: 100. */
+  yearRange?: number
 }
 
 function usesDropdownCaption(layout: DayPickerProps['captionLayout'] | undefined): boolean {
   return layout === 'dropdown' || layout === 'dropdown-months' || layout === 'dropdown-years'
+}
+
+function monthForPicker(value: string, min?: string, max?: string): Date {
+  const selected = value ? parseDateValue(value) : undefined
+  const minDate = min ? parseDateValue(min) : undefined
+  const maxDate = max ? parseDateValue(max) : undefined
+  return selected ?? maxDate ?? minDate ?? new Date()
 }
 
 export function DatePicker({
@@ -34,28 +43,38 @@ export function DatePicker({
   placeholder = 'Pick a date',
   min,
   max,
-  captionLayout = 'label',
+  captionLayout = 'dropdown',
   reverseYears,
+  yearRange = 100,
 }: DatePickerProps) {
   const [open, setOpen] = useState(false)
-  const selected = parseDateValue(value)
+  const selected = value ? parseDateValue(value) : undefined
   const minDate = min ? parseDateValue(min) : undefined
   const maxDate = max ? parseDateValue(max) : undefined
   const label = formatDateDisplay(value)
   const dropdownCaption = usesDropdownCaption(captionLayout)
-  const endMonth = maxDate ?? new Date()
-  const startMonth = minDate ?? (dropdownCaption ? subYears(endMonth, 30) : undefined)
 
-  const [month, setMonth] = useState<Date>(
-    () => selected ?? maxDate ?? minDate ?? new Date(),
-  )
+  const endMonth = useMemo(() => {
+    if (maxDate) return startOfMonth(maxDate)
+    return startOfMonth(new Date())
+  }, [max])
 
-  useEffect(() => {
-    if (selected) setMonth(selected)
-  }, [value])
+  const startMonth = useMemo(() => {
+    if (minDate) return startOfMonth(minDate)
+    return subYears(endMonth, yearRange)
+  }, [min, yearRange, endMonth])
+
+  const [month, setMonth] = useState<Date>(() => monthForPicker(value, min, max))
+
+  function handleOpenChange(next: boolean) {
+    if (next) {
+      setMonth(monthForPicker(value, min, max))
+    }
+    setOpen(next)
+  }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <PickerTrigger
           id={id}
@@ -83,15 +102,11 @@ export function DatePicker({
           }}
           captionLayout={captionLayout}
           reverseYears={reverseYears}
-          startMonth={dropdownCaption ? startMonth : undefined}
-          endMonth={dropdownCaption ? endMonth : undefined}
-          month={dropdownCaption ? month : undefined}
-          onMonthChange={dropdownCaption ? setMonth : undefined}
-          defaultMonth={
-            dropdownCaption
-              ? undefined
-              : selected ?? (min ? parseISO(`${min}T12:00:00`) : undefined)
-          }
+          startMonth={startMonth}
+          endMonth={endMonth}
+          month={month}
+          onMonthChange={setMonth}
+          hideNavigation={dropdownCaption}
         />
       </PopoverContent>
     </Popover>

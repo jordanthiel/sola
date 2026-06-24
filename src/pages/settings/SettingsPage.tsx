@@ -25,6 +25,7 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { HouseholdHolidaySettings } from '@/components/settings/HouseholdHolidaySettings'
 import { HouseholdMembersCard } from '@/components/settings/HouseholdMembersCard'
 import { NotificationSettingsCard } from '@/components/settings/NotificationSettingsCard'
+import { GustoPayrollSetupCard } from '@/components/settings/GustoPayrollSetupCard'
 
 export function SettingsPage() {
   const navigate = useNavigate()
@@ -251,6 +252,8 @@ export function SettingsPage() {
           </Card>
 
           <HouseholdHolidaySettings />
+
+          <GustoPayrollSetupCard />
 
           <HouseholdMembersCard />
 

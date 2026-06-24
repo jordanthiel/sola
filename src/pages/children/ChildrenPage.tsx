@@ -135,7 +135,6 @@ export function ChildrenPage() {
               <DatePicker
                 value={dob}
                 onChange={setDob}
-                captionLayout="dropdown"
                 reverseYears
                 max={format(new Date(), 'yyyy-MM-dd')}
                 min={format(subYears(new Date(), 25), 'yyyy-MM-dd')}

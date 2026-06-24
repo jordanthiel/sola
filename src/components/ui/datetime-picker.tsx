@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { addYears, startOfMonth, subYears } from 'date-fns'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Calendar } from '@/components/ui/calendar'
 import { PickerTrigger } from '@/components/ui/picker-trigger'
@@ -53,7 +54,7 @@ export function DateTimePicker({
 }: DateTimePickerProps) {
   const [open, setOpen] = useState(false)
   const { date, time } = parseDatetimeLocalValue(value)
-  const selected = parseDateValue(date)
+  const selected = date ? parseDateValue(date) : undefined
   const parsedTime = parseTimeValue(time)
   const { hour12, period } = parsedTime
     ? to12Hour(parsedTime.hours)
@@ -61,6 +62,18 @@ export function DateTimePicker({
   const minutes = parsedTime?.minutes ?? 0
   const minuteChoices = minuteOptions(minuteStep, parsedTime?.minutes)
   const label = formatDatetimeDisplay(value)
+
+  const startMonth = useMemo(() => startOfMonth(subYears(new Date(), 1)), [])
+  const endMonth = useMemo(() => startOfMonth(addYears(new Date(), 2)), [])
+
+  const [month, setMonth] = useState<Date>(() => selected ?? new Date())
+
+  function handleOpenChange(next: boolean) {
+    if (next && selected) {
+      setMonth(selected)
+    }
+    setOpen(next)
+  }
 
   const setDate = (nextDate: string) => {
     onChange(combineDatetimeLocal(nextDate, time || '09:00'))
@@ -72,7 +85,7 @@ export function DateTimePicker({
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <PickerTrigger
           id={id}
@@ -93,7 +106,12 @@ export function DateTimePicker({
             if (!d) return
             setDate(dateToValue(d))
           }}
-          defaultMonth={selected}
+          captionLayout="dropdown"
+          startMonth={startMonth}
+          endMonth={endMonth}
+          month={month}
+          onMonthChange={setMonth}
+          hideNavigation
         />
         <div className="border-t border-[var(--color-border)] p-3">
           <p className="mb-2 text-xs font-medium text-[var(--color-muted-foreground)]">Time</p>

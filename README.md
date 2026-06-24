@@ -12,6 +12,7 @@ A multi-household nanny management app for families. Parents manage schedules, p
 - Multi-household tenancy with role-based access (`owner`, `parent`, `nanny`)
 - Schedule planning (past and upcoming shifts)
 - Payroll preview: scheduled vs actual hours, bonuses, mileage, pay period close, pay stub PDF
+- **Gusto Embedded** (optional): compliant pay runs, withholding, and ACH after period close — see [docs/GUSTO_EMBEDDED.md](docs/GUSTO_EMBEDDED.md)
 - Payment advance tracking
 - Sick / PTO requests and balances
 - Children care sheets (allergies, meds, routines) and emergency contacts
@@ -84,7 +85,19 @@ npx supabase secrets set RESEND_API_KEY=re_xxxx EMAIL_FROM="Sova Home <hello@sov
 
 Invites send email when Resend is configured.
 
-### 5. Start the app
+### 5. Gusto Embedded payroll (optional)
+
+```bash
+# Credentials in supabase/functions/.env — see docs/GUSTO_EMBEDDED.md
+npx supabase functions serve gusto-api gusto-webhook
+# Hosted:
+npx supabase functions deploy gusto-api gusto-webhook
+npx supabase secrets set GUSTO_CLIENT_ID=xxx GUSTO_CLIENT_SECRET=xxx GUSTO_ENV=demo
+```
+
+Parents enable payroll under **Settings → Gusto payroll**, complete Gusto onboarding, then submit closed pay periods from the **Payroll** page.
+
+### 6. Start the app
 
 ```bash
 npm run dev

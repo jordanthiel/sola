@@ -24,6 +24,7 @@ import {
 import { AdvanceRepaymentsPeriodCard } from '@/components/payroll/AdvanceRepaymentsPeriodCard'
 import { PayPeriodHistoryCard } from '@/components/payroll/PayPeriodHistoryCard'
 import { PayrollHoursBreakdownDialog } from '@/components/payroll/PayrollHoursBreakdownDialog'
+import { GustoPayrollCard } from '@/components/payroll/GustoPayrollCard'
 import { PayReportingBreakdown } from '@/components/payroll/PayReportingBreakdown'
 import { PaymentAdvancesCard } from '@/components/payroll/PaymentAdvancesCard'
 import {
@@ -627,6 +628,23 @@ export function PayrollPage() {
               )}
             </CardContent>
           </Card>
+
+          {isParent && periodClose && householdNannyId && (
+            <GustoPayrollCard
+              payPeriodCloseId={periodClose.id}
+              householdNannyId={householdNannyId}
+              employmentType={settings.employment_type}
+              payReportingMode={settings.pay_reporting_mode}
+            />
+          )}
+
+          {periodClose?.paid_at && (
+            <p className="text-sm text-green-700 dark:text-green-400">
+              Marked paid {format(new Date(periodClose.paid_at), 'MMM d, yyyy h:mm a')}
+              {periodClose.paid_amount_cents != null &&
+                ` · ${formatCurrency(periodClose.paid_amount_cents)}`}
+            </p>
+          )}
 
           {isParent && householdNannyId && periodStartStr && (
             <PayrollLineItemsCard

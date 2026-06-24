@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
@@ -37,16 +38,20 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
     () => localStorage.getItem(STORAGE_KEY),
   )
   const [loading, setLoading] = useState(true)
+  const hasLoadedOnceRef = useRef(false)
 
   const refreshHouseholds = useCallback(async () => {
     if (!user) {
       setHouseholds([])
       setMemberships([])
       setLoading(false)
+      hasLoadedOnceRef.current = false
       return
     }
 
-    setLoading(true)
+    if (!hasLoadedOnceRef.current) {
+      setLoading(true)
+    }
 
     try {
       const { households: hh, memberships: memberRows } = await fetchMyHouseholds(user.id)
@@ -69,6 +74,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       setHouseholds([])
       setMemberships([])
     } finally {
+      hasLoadedOnceRef.current = true
       setLoading(false)
     }
   }, [user, sessionContext?.household_id])
