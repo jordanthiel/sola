@@ -21,6 +21,7 @@ import type { TemplateOccurrence } from '@/lib/schedule'
 import type { NannyScheduleTemplate } from '@/types/schedule-template'
 import type { ScheduleBlock } from '@/types/database'
 import { PageHeader } from '@/components/layout/PageHeader'
+import { GettingStartedCard } from '@/components/dashboard/GettingStartedCard'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -93,6 +94,8 @@ export function ParentDashboard() {
   return (
     <div className="space-y-6">
       <PageHeader title="Dashboard" subtitle={activeHousehold?.name} />
+
+      <GettingStartedCard />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Card className={cn('stat-card stat-card-highlight border-l-0')}>

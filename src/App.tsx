@@ -13,6 +13,7 @@ import { SignupPage } from '@/pages/auth/Signup'
 import { AcceptInvitePage } from '@/pages/auth/AcceptInvite'
 import { ClaimNannyPage } from '@/pages/auth/ClaimNannyPage'
 import { CreateHouseholdPage } from '@/pages/onboarding/CreateHousehold'
+import { OnboardingSetupPage } from '@/pages/onboarding/OnboardingSetupPage'
 import { DashboardPage } from '@/pages/dashboard/DashboardPage'
 import { SchedulePage } from '@/pages/schedule/SchedulePage'
 import { PayrollPage } from '@/pages/payroll/PayrollPage'
@@ -20,12 +21,12 @@ import { TimeOffPage } from '@/pages/time-off/TimeOffPage'
 import { ChildrenPage } from '@/pages/children/ChildrenPage'
 import { ActivitiesPage } from '@/pages/activities/ActivitiesPage'
 import { SettingsPage } from '@/pages/settings/SettingsPage'
-import { GustoFlowPage } from '@/pages/settings/GustoFlowPage'
 import { NannyPage } from '@/pages/settings/NannyPage'
 import { DocumentsPage } from '@/pages/documents/DocumentsPage'
 import { FeedPage } from '@/pages/feed/FeedPage'
 import { IncidentsPage } from '@/pages/incidents/IncidentsPage'
 import { AdvanceDetailPage } from '@/pages/advances/AdvanceDetailPage'
+import { HomeRoute } from '@/components/routes/HomeRoute'
 
 export default function App() {
   return (
@@ -34,6 +35,7 @@ export default function App() {
         <HouseholdProvider>
           <BrowserRouter>
             <Routes>
+              <Route path="/" element={<HomeRoute />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/signup" element={<SignupPage />} />
               <Route path="/invite" element={<AcceptInvitePage />} />
@@ -42,9 +44,10 @@ export default function App() {
               <Route element={<RequireAuth />}>
                 <Route element={<RequireAccountSetup />}>
                   <Route path="/onboarding" element={<CreateHouseholdPage />} />
+                  <Route path="/onboarding/setup" element={<OnboardingSetupPage />} />
                   <Route element={<RequireHousehold />}>
                     <Route element={<AppShell />}>
-                      <Route index element={<DashboardPage />} />
+                      <Route path="dashboard" element={<DashboardPage />} />
                       <Route path="schedule" element={<SchedulePage />} />
                       <Route path="hours" element={<Navigate to="/schedule" replace />} />
                       <Route path="payroll" element={<PayrollPage />} />
@@ -56,7 +59,6 @@ export default function App() {
                       <Route path="feed" element={<FeedPage />} />
                       <Route path="incidents" element={<IncidentsPage />} />
                       <Route path="settings" element={<SettingsPage />} />
-                      <Route path="settings/gusto" element={<GustoFlowPage />} />
                       <Route path="settings/nannies/:nannyId" element={<NannyPage />} />
                     </Route>
                   </Route>

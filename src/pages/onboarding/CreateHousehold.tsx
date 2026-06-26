@@ -1,34 +1,27 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useHousehold } from '@/contexts/HouseholdContext'
 import { formatSupabaseError } from '@/lib/errors'
+import { buildTimezoneOptions, detectUserTimezone, formatTimezoneLabel, resolveDefaultTimezone } from '@/lib/timezone'
 import { isNannyAccount } from '@/types/account'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
-const TIMEZONES = [
-  'America/New_York',
-  'America/Chicago',
-  'America/Denver',
-  'America/Los_Angeles',
-  'America/Phoenix',
-  'Europe/London',
-  'Europe/Paris',
-  'Asia/Tokyo',
-]
-
 export function CreateHouseholdPage() {
   const { accountKind, sessionContext, loading: authLoading, refreshSession } = useAuth()
   const { refreshHouseholds, setActiveHouseholdId } = useHousehold()
   const navigate = useNavigate()
   const [name, setName] = useState('')
-  const [timezone, setTimezone] = useState('America/New_York')
+  const [timezone, setTimezone] = useState(() => resolveDefaultTimezone())
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  const timezoneOptions = useMemo(() => buildTimezoneOptions(timezone), [timezone])
+  const detectedTimezone = useMemo(() => detectUserTimezone(), [])
 
   if (!authLoading && isNannyAccount(accountKind)) {
     return <Navigate to="/" replace />
@@ -36,7 +29,7 @@ export function CreateHouseholdPage() {
 
   useEffect(() => {
     if (sessionContext?.has_household_access) {
-      navigate('/', { replace: true })
+      navigate('/onboarding/setup', { replace: true })
     }
   }, [sessionContext?.has_household_access, navigate])
 
@@ -61,7 +54,7 @@ export function CreateHouseholdPage() {
 
       await refreshHouseholds()
       await refreshSession()
-      navigate('/', { replace: true })
+      navigate('/onboarding/setup', { replace: true })
     } catch (err) {
       console.error('create_household_with_owner failed:', err)
       setError(formatSupabaseError(err))
@@ -108,9 +101,10 @@ export function CreateHouseholdPage() {
                 value={timezone}
                 onChange={(e) => setTimezone(e.target.value)}
               >
-                {TIMEZONES.map((tz) => (
+                {timezoneOptions.map((tz) => (
                   <option key={tz} value={tz}>
-                    {tz}
+                    {formatTimezoneLabel(tz)}
+                    {tz === detectedTimezone ? ' (your timezone)' : ''}
                   </option>
                 ))}
               </select>

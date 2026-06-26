@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button'
 const CATEGORY_LABELS: Record<keyof NotificationCategories, string> = {
   schedule: 'Schedule changes',
   time_off: 'Time off',
-  payroll: 'Payroll',
+  payroll: 'Earnings',
   feed: 'Household feed',
   incidents: 'Incidents',
   plans: "Kids' plans",

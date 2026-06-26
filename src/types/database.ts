@@ -65,6 +65,7 @@ export interface Database {
           created_by: string | null
           created_at: string
           updated_at: string
+          onboarding_completed_at: string | null
         }
         Insert: {
           id?: string
@@ -73,6 +74,7 @@ export interface Database {
           created_by?: string | null
           created_at?: string
           updated_at?: string
+          onboarding_completed_at?: string | null
         }
         Update: {
           id?: string
@@ -81,6 +83,7 @@ export interface Database {
           created_by?: string | null
           created_at?: string
           updated_at?: string
+          onboarding_completed_at?: string | null
         }
         Relationships: []
       }
@@ -1081,6 +1084,10 @@ export interface Database {
         Args: { p_claim_token: string }
         Returns: string
       }
+      complete_household_onboarding: {
+        Args: { p_household_id: string }
+        Returns: undefined
+      }
       list_my_households: {
         Args: Record<string, never>
         Returns: {
@@ -1090,6 +1097,7 @@ export interface Database {
           created_by: string | null
           created_at: string
           updated_at: string
+          onboarding_completed_at: string | null
           member_role: MemberRole
         }[]
       }

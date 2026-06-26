@@ -77,7 +77,7 @@ export function generatePayStubPdf(snapshot: PayrollSnapshot): jsPDF {
   line('', false)
   doc.setFontSize(9)
   doc.setTextColor(120)
-  doc.text('This is a household payroll preview, not an official tax document.', 20, y)
+  doc.text('This is a household earnings summary, not an official tax document.', 20, y)
 
   return doc
 }

@@ -57,7 +57,7 @@ export function AdvanceDetailPage() {
   }
 
   if (!advance || advance.household_nanny_id !== myNanny?.id) {
-    return <Navigate to="/" replace />
+    return <Navigate to="/dashboard" replace />
   }
 
   const estimate = settings
@@ -71,7 +71,7 @@ export function AdvanceDetailPage() {
         subtitle={`Granted ${format(parseISO(advance.issued_on), 'MMM d, yyyy')}`}
         action={
           <Button variant="outline" size="sm" asChild>
-            <Link to="/">
+            <Link to="/dashboard">
               <ChevronLeft className="mr-1 h-4 w-4" />
               Dashboard
             </Link>
@@ -161,7 +161,7 @@ export function AdvanceDetailPage() {
       </Card>
 
       <Button variant="outline" asChild>
-        <Link to="/payroll">View payroll</Link>
+        <Link to="/payroll">View earnings</Link>
       </Button>
     </div>
   )

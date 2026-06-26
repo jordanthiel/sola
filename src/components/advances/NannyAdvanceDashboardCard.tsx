@@ -89,7 +89,7 @@ export function NannyAdvanceDashboardCard({ householdNannyId }: NannyAdvanceDash
         )}
         <Button variant="link" className="h-auto px-0 py-0 text-xs" asChild>
           <Link to={outstanding.length === 1 ? `/payroll/advances/${outstanding[0]!.id}` : '/payroll'}>
-            {outstanding.length === 1 ? 'View advance details' : 'Open payroll'} →
+            {outstanding.length === 1 ? 'View advance details' : 'Open earnings'} →
           </Link>
         </Button>
       </CardContent>
