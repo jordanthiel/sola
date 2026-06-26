@@ -190,6 +190,8 @@ export interface AdvancePayoffEstimate {
   estimatedPayoffDate: Date | null
   estimatedPayoffLabel: string
   paychecksRemaining: number | null
+  /** True when payoff is projected from usual schedule OT (may change with actual hours). */
+  estimatedPayoffApproximate?: boolean
 }
 
 /** End date of the Nth pay period from anchor (N=1 is the period containing anchor). */

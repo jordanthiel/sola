@@ -1,8 +1,8 @@
-import { addDays, isBefore, parseISO, startOfDay } from 'date-fns'
+import { addDays, format, isBefore, parseISO, startOfDay } from 'date-fns'
 import type { AdvanceRepaymentMode, EmploymentSetting, PayPeriodType, ScheduleBlock } from '@/types/database'
 import type { PaymentAdvance } from '@/types/database'
 import type { NannyScheduleTemplate } from '@/types/schedule-template'
-import { calculateAdvanceDeductions } from '@/lib/advances'
+import { calculateAdvanceDeductions, estimateAdvancePayoff, type AdvancePayoffEstimate } from '@/lib/advances'
 import { getPayPeriodBounds } from '@/lib/payroll'
 import { type PayableShift, payableShiftMinutes, payableShiftsInPeriod } from '@/lib/schedule-hours'
 
@@ -225,4 +225,135 @@ function formatRange(start: Date, end: Date): string {
 
 export function isIssuedInPast(issuedOn: string): boolean {
   return parseISO(issuedOn) < startOfDay(new Date())
+}
+
+/** Pay periods from anchor forward (first period contains anchor). */
+export function upcomingPayPeriods(
+  payPeriod: PayPeriodType,
+  anchor: Date = new Date(),
+  maxPeriods = 120,
+): { start: Date; end: Date }[] {
+  const out: { start: Date; end: Date }[] = []
+  let periodAnchor = anchor
+  for (let i = 0; i < maxPeriods; i++) {
+    const { start, end } = getPayPeriodBounds(payPeriod, periodAnchor)
+    out.push({ start, end })
+    periodAnchor = addDays(end, 1)
+  }
+  return out
+}
+
+function fakeOvertimeAdvance(balance: number, schedule: ScheduleBackfillInput, issuedOn: string): PaymentAdvance {
+  return {
+    id: 'preview',
+    household_id: '',
+    household_nanny_id: schedule.householdNannyId,
+    nanny_user_id: null,
+    amount_cents: balance,
+    balance_cents: balance,
+    issued_on: issuedOn,
+    reason: null,
+    repayment_mode: 'overtime_only',
+    repayment_per_paycheck_cents: null,
+    status: 'open',
+    applied_pay_period_start: null,
+    created_at: '',
+    updated_at: '',
+  }
+}
+
+/** Project payoff using the default weekly schedule (templates only, no one-off blocks). */
+export function estimateOvertimePayoffFromSchedule(
+  balanceCents: number,
+  settings: EmploymentSetting,
+  schedule: ScheduleBackfillInput,
+  anchor: Date = new Date(),
+): {
+  estimatedPayoffDate: Date
+  paychecksRemaining: number
+  typicalOvertimeMinutesPerPeriod: number
+  typicalRepaymentPerPeriodCents: number
+} | null {
+  if (balanceCents <= 0 || !hasUsualSchedule(schedule)) return null
+
+  const templateSchedule: ScheduleBackfillInput = { ...schedule, blocks: [] }
+  let balance = balanceCents
+  let periods = 0
+  let firstPeriodOtMinutes = 0
+  let firstPeriodRepayment = 0
+
+  for (const { start, end } of upcomingPayPeriods(settings.pay_period, anchor)) {
+    periods++
+    const periodShifts = shiftsForPeriod(templateSchedule, start, end)
+    const { grossPayCents, overtimePayCents, overtimeMinutes } = payrollAmountsForPeriod(
+      periodShifts,
+      settings,
+      start,
+      end,
+    )
+    const { totalDeductionCents } = calculateAdvanceDeductions(
+      [fakeOvertimeAdvance(balance, schedule, format(start, 'yyyy-MM-dd'))],
+      overtimePayCents,
+      grossPayCents,
+    )
+
+    if (periods === 1) {
+      firstPeriodOtMinutes = overtimeMinutes
+      firstPeriodRepayment = totalDeductionCents
+      if (totalDeductionCents <= 0) return null
+    }
+
+    balance -= totalDeductionCents
+    if (balance <= 0) {
+      return {
+        estimatedPayoffDate: end,
+        paychecksRemaining: periods,
+        typicalOvertimeMinutesPerPeriod: firstPeriodOtMinutes,
+        typicalRepaymentPerPeriodCents: firstPeriodRepayment,
+      }
+    }
+  }
+
+  return null
+}
+
+export function buildAdvancePayoffEstimate(
+  advance: PaymentAdvance,
+  settings: EmploymentSetting,
+  schedule?: ScheduleBackfillInput,
+  anchor: Date = new Date(),
+): AdvancePayoffEstimate {
+  const base = estimateAdvancePayoff(advance, settings.pay_period, anchor)
+
+  if (advance.repayment_mode !== 'overtime_only' || advance.balance_cents <= 0) {
+    return base
+  }
+
+  if (!schedule) {
+    return base
+  }
+
+  const projection = estimateOvertimePayoffFromSchedule(
+    advance.balance_cents,
+    settings,
+    schedule,
+    anchor,
+  )
+
+  if (!projection) {
+    return {
+      ...base,
+      estimatedPayoffLabel: !hasUsualSchedule(schedule)
+        ? 'Set your usual weekly schedule to estimate payoff'
+        : 'Depends on overtime hours each pay period',
+    }
+  }
+
+  return {
+    ...base,
+    estimatedPayoffDate: projection.estimatedPayoffDate,
+    estimatedPayoffLabel: `${projection.paychecksRemaining} paycheck${projection.paychecksRemaining === 1 ? '' : 's'} at usual overtime`,
+    paychecksRemaining: projection.paychecksRemaining,
+    estimatedPayoffApproximate: true,
+  }
 }
