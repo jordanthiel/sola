@@ -8,9 +8,13 @@ import {
   useEmploymentSettings,
   useMyHouseholdNanny,
   usePaymentAdvances,
+  useScheduleTemplates,
 } from '@/hooks/useHouseholdData'
 import { AdvanceRepaymentHistory } from '@/components/advances/NannyAdvanceDashboardCard'
-import { estimateAdvancePayoff, repaymentModeLabel } from '@/lib/advances'
+import { EstimatedPayoffDisplay, EstimatedPayoffFootnote } from '@/components/advances/EstimatedPayoffDisplay'
+import { buildAdvancePayoffEstimate, type ScheduleBackfillInput } from '@/lib/advance-backfill'
+import { repaymentModeLabel } from '@/lib/advances'
+import type { NannyScheduleTemplate } from '@/types/schedule-template'
 import { formatCurrency } from '@/lib/utils'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
@@ -25,7 +29,17 @@ export function AdvanceDetailPage() {
   const { data: advances, isLoading } = usePaymentAdvances(myNanny?.id)
   const { data: repayments } = useAdvanceRepayments(myNanny?.id)
   const { data: settingsList } = useEmploymentSettings(myNanny?.id)
+  const { data: templates } = useScheduleTemplates(myNanny?.id)
   const settings = settingsList?.[0]
+
+  const scheduleInput = useMemo((): ScheduleBackfillInput | undefined => {
+    if (!myNanny?.id) return undefined
+    return {
+      blocks: [],
+      templates: (templates ?? []) as NannyScheduleTemplate[],
+      householdNannyId: myNanny.id,
+    }
+  }, [myNanny?.id, templates])
 
   const advance = advances?.find((a) => a.id === advanceId)
 
@@ -43,11 +57,11 @@ export function AdvanceDetailPage() {
   }
 
   if (!advance || advance.household_nanny_id !== myNanny?.id) {
-    return <Navigate to="/" replace />
+    return <Navigate to="/dashboard" replace />
   }
 
   const estimate = settings
-    ? estimateAdvancePayoff(advance, settings.pay_period)
+    ? buildAdvancePayoffEstimate(advance, settings, scheduleInput)
     : null
 
   return (
@@ -57,7 +71,7 @@ export function AdvanceDetailPage() {
         subtitle={`Granted ${format(parseISO(advance.issued_on), 'MMM d, yyyy')}`}
         action={
           <Button variant="outline" size="sm" asChild>
-            <Link to="/">
+            <Link to="/dashboard">
               <ChevronLeft className="mr-1 h-4 w-4" />
               Dashboard
             </Link>
@@ -113,22 +127,25 @@ export function AdvanceDetailPage() {
                 Estimated payoff
               </dt>
               <dd className="mt-1 font-medium">
-                {estimate?.estimatedPayoffDate
-                  ? format(estimate.estimatedPayoffDate, 'MMMM d, yyyy')
-                  : estimate?.estimatedPayoffLabel ?? '—'}
+                {estimate ? (
+                  <EstimatedPayoffDisplay estimate={estimate} dateFormat="MMMM d, yyyy" />
+                ) : (
+                  '—'
+                )}
               </dd>
               {estimate?.paychecksRemaining != null && estimate.paychecksRemaining > 0 && (
                 <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">
                   {estimate.estimatedPayoffLabel}
                 </p>
               )}
+              {estimate && <EstimatedPayoffFootnote estimate={estimate} />}
             </div>
           </dl>
 
-          {advance.repayment_mode === 'overtime_only' && (
+          {advance.repayment_mode === 'overtime_only' && !estimate?.estimatedPayoffApproximate && (
             <p className="rounded-lg border bg-[var(--color-muted)]/30 px-4 py-3 text-sm text-[var(--color-muted-foreground)]">
-              This advance is repaid from overtime earnings only. The payoff date depends on how many
-              overtime hours you work each pay period.
+              This advance is repaid from overtime earnings only. Set your usual weekly schedule to
+              see an estimated payoff date.
             </p>
           )}
         </CardContent>
@@ -144,7 +161,7 @@ export function AdvanceDetailPage() {
       </Card>
 
       <Button variant="outline" asChild>
-        <Link to="/payroll">View payroll</Link>
+        <Link to="/payroll">View earnings</Link>
       </Button>
     </div>
   )

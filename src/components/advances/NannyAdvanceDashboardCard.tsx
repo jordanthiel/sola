@@ -5,15 +5,18 @@ import { ChevronRight, HandCoins } from 'lucide-react'
 import {
   useEmploymentSettings,
   usePaymentAdvances,
+  useScheduleTemplates,
 } from '@/hooks/useHouseholdData'
+import { buildAdvancePayoffEstimate, type ScheduleBackfillInput } from '@/lib/advance-backfill'
 import {
-  estimateAdvancePayoff,
   openAdvances,
   repaymentModeLabel,
   totalAdvanceBalance,
 } from '@/lib/advances'
+import { EstimatedPayoffDisplay, EstimatedPayoffFootnote } from '@/components/advances/EstimatedPayoffDisplay'
 import { repaymentSourceLabel, type AdvanceRepayment } from '@/types/advance-repayment'
-import type { PayPeriodType, PaymentAdvance } from '@/types/database'
+import type { EmploymentSetting, PaymentAdvance } from '@/types/database'
+import type { NannyScheduleTemplate } from '@/types/schedule-template'
 import { formatCurrency } from '@/lib/utils'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -26,14 +29,22 @@ interface NannyAdvanceDashboardCardProps {
 export function NannyAdvanceDashboardCard({ householdNannyId }: NannyAdvanceDashboardCardProps) {
   const { data: advances } = usePaymentAdvances(householdNannyId)
   const { data: settingsList } = useEmploymentSettings(householdNannyId)
+  const { data: templates } = useScheduleTemplates(householdNannyId)
   const settings = settingsList?.[0]
+
+  const scheduleInput = useMemo((): ScheduleBackfillInput | undefined => {
+    if (!householdNannyId) return undefined
+    return {
+      blocks: [],
+      templates: (templates ?? []) as NannyScheduleTemplate[],
+      householdNannyId,
+    }
+  }, [householdNannyId, templates])
 
   const outstanding = useMemo(() => openAdvances(advances ?? []), [advances])
   const totalBalance = useMemo(() => totalAdvanceBalance(outstanding), [outstanding])
 
   if (!outstanding.length || !settings) return null
-
-  const payPeriod = settings.pay_period
 
   return (
     <Card className="border-l-4 border-l-amber-500">
@@ -48,13 +59,14 @@ export function NannyAdvanceDashboardCard({ householdNannyId }: NannyAdvanceDash
         {outstanding.length === 1 ? (
           <AdvanceDashboardSummary
             advance={outstanding[0]!}
-            payPeriod={payPeriod}
+            settings={settings}
+            scheduleInput={scheduleInput}
             detailTo={`/payroll/advances/${outstanding[0]!.id}`}
           />
         ) : (
           <ul className="divide-y rounded-lg border">
             {outstanding.map((advance) => {
-              const estimate = estimateAdvancePayoff(advance, payPeriod)
+              const estimate = buildAdvancePayoffEstimate(advance, settings, scheduleInput)
               return (
                 <li key={advance.id}>
                   <Link
@@ -77,7 +89,7 @@ export function NannyAdvanceDashboardCard({ householdNannyId }: NannyAdvanceDash
         )}
         <Button variant="link" className="h-auto px-0 py-0 text-xs" asChild>
           <Link to={outstanding.length === 1 ? `/payroll/advances/${outstanding[0]!.id}` : '/payroll'}>
-            {outstanding.length === 1 ? 'View advance details' : 'Open payroll'} →
+            {outstanding.length === 1 ? 'View advance details' : 'Open earnings'} →
           </Link>
         </Button>
       </CardContent>
@@ -87,14 +99,16 @@ export function NannyAdvanceDashboardCard({ householdNannyId }: NannyAdvanceDash
 
 function AdvanceDashboardSummary({
   advance,
-  payPeriod,
+  settings,
+  scheduleInput,
   detailTo,
 }: {
   advance: PaymentAdvance
-  payPeriod: PayPeriodType
+  settings: EmploymentSetting
+  scheduleInput: ScheduleBackfillInput | undefined
   detailTo: string
 }) {
-  const estimate = estimateAdvancePayoff(advance, payPeriod)
+  const estimate = buildAdvancePayoffEstimate(advance, settings, scheduleInput)
 
   return (
     <div className="space-y-3">
@@ -125,10 +139,9 @@ function AdvanceDashboardSummary({
         <div>
           <dt className="text-[var(--color-muted-foreground)]">Estimated payoff</dt>
           <dd className="font-medium">
-            {estimate.estimatedPayoffDate
-              ? format(estimate.estimatedPayoffDate, 'MMM d, yyyy')
-              : estimate.estimatedPayoffLabel}
+            <EstimatedPayoffDisplay estimate={estimate} />
           </dd>
+          <EstimatedPayoffFootnote estimate={estimate} />
         </div>
       </dl>
       {advance.reason && (

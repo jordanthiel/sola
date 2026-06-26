@@ -1,6 +1,7 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { useHousehold } from '@/contexts/HouseholdContext'
+import { householdNeedsOnboarding } from '@/lib/onboarding'
 import { isFamilyAccount, isNannyAccount } from '@/types/account'
 
 /**
@@ -8,7 +9,7 @@ import { isFamilyAccount, isNannyAccount } from '@/types/account'
  */
 export function RequireAccountSetup() {
   const { accountKind, sessionContext, loading: authLoading } = useAuth()
-  const { hasHouseholdAccess, loading: householdLoading } = useHousehold()
+  const { hasHouseholdAccess, loading: householdLoading, activeHousehold, isParent } = useHousehold()
   const location = useLocation()
 
   const loading = authLoading || householdLoading
@@ -25,9 +26,11 @@ export function RequireAccountSetup() {
     hasHouseholdAccess ||
     sessionContext?.has_household_access === true
   const onOnboarding = location.pathname === '/onboarding'
+  const onSetup = location.pathname === '/onboarding/setup'
+  const needsSetup = isParent && householdNeedsOnboarding(activeHousehold)
 
   if (isNannyAccount(accountKind)) {
-    if (onOnboarding) return <Navigate to="/" replace />
+    if (onOnboarding || onSetup) return <Navigate to="/" replace />
     return <Outlet />
   }
 
@@ -36,13 +39,25 @@ export function RequireAccountSetup() {
       return <Navigate to="/onboarding" replace />
     }
     if (hasHousehold && onOnboarding) {
-      return <Navigate to="/" replace />
+      return <Navigate to={needsSetup ? '/onboarding/setup' : '/'} replace />
+    }
+    if (hasHousehold && needsSetup && !onSetup) {
+      return <Navigate to="/onboarding/setup" replace />
+    }
+    if (hasHousehold && !needsSetup && onSetup) {
+      return <Navigate to="/dashboard" replace />
     }
     return <Outlet />
   }
 
   if (hasHousehold) {
-    if (onOnboarding) return <Navigate to="/" replace />
+    if (onOnboarding) return <Navigate to={needsSetup ? '/onboarding/setup' : '/'} replace />
+    if (needsSetup && !onSetup) {
+      return <Navigate to="/onboarding/setup" replace />
+    }
+    if (!needsSetup && onSetup) {
+      return <Navigate to="/dashboard" replace />
+    }
     return <Outlet />
   }
 

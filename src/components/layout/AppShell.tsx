@@ -27,7 +27,17 @@ import { Button } from '@/components/ui/button'
 import { APP_NAME } from '@/lib/app'
 import { isDeactivatedNannyAllowedPath } from '@/lib/deactivated-nanny-access'
 import { useMyNannyAccess } from '@/hooks/useMyNannyAccess'
+import { ProductTour } from '@/components/onboarding/ProductTour'
 import { cn } from '@/lib/utils'
+
+const TOUR_TARGETS: Record<string, string> = {
+  '/dashboard': 'nav-dashboard',
+  '/schedule': 'nav-schedule',
+  '/payroll': 'nav-payroll',
+  '/activities': 'nav-activities',
+  '/feed': 'nav-feed',
+  '/settings': 'nav-settings',
+}
 
 type NavItem = { to: string; label: string; icon: typeof Home }
 type NavGroup = { label: string; items: NavItem[] }
@@ -36,9 +46,9 @@ const parentNavGroups: NavGroup[] = [
   {
     label: 'Overview',
     items: [
-      { to: '/', label: 'Dashboard', icon: Home },
+      { to: '/dashboard', label: 'Dashboard', icon: Home },
       { to: '/schedule', label: 'Schedule', icon: Calendar },
-      { to: '/payroll', label: 'Payroll', icon: Wallet },
+      { to: '/payroll', label: 'Earnings', icon: Wallet },
       { to: '/time-off', label: 'Time off', icon: Palmtree },
     ],
   },
@@ -64,9 +74,9 @@ const nannyNavGroups: NavGroup[] = [
   {
     label: 'Overview',
     items: [
-      { to: '/', label: 'Dashboard', icon: Home },
+      { to: '/dashboard', label: 'Dashboard', icon: Home },
       { to: '/schedule', label: 'Schedule', icon: Calendar },
-      { to: '/payroll', label: 'Payroll', icon: Wallet },
+      { to: '/payroll', label: 'Earnings', icon: Wallet },
       { to: '/time-off', label: 'Time off', icon: Palmtree },
     ],
   },
@@ -92,7 +102,7 @@ const deactivatedNannyNavGroups: NavGroup[] = [
   {
     label: 'Records',
     items: [
-      { to: '/payroll', label: 'Payroll history', icon: Wallet },
+      { to: '/payroll', label: 'Earnings history', icon: Wallet },
       { to: '/settings', label: 'Profile', icon: Settings },
     ],
   },
@@ -117,7 +127,8 @@ function NavItems({
               <NavLink
                 key={to}
                 to={to}
-                end={to === '/'}
+                end={to === '/dashboard'}
+                data-tour={TOUR_TARGETS[to]}
                 onClick={onNavigate}
                 className={({ isActive }) =>
                   cn(
@@ -222,10 +233,11 @@ export function AppShell() {
 
   return (
     <div className="flex min-h-screen">
+      <ProductTour />
       {/* Desktop sidebar */}
       <aside className="sticky top-0 hidden h-screen max-h-screen w-[260px] shrink-0 flex-col border-r border-[var(--color-sidebar-border)] bg-[var(--color-sidebar)] md:flex">
         <div className="shrink-0 border-b border-[var(--color-sidebar-border)] px-5 py-5">
-          <Link to="/" className="flex items-center gap-2.5">
+          <Link to="/dashboard" className="flex items-center gap-2.5">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--color-primary)] text-[var(--color-primary-foreground)] shadow-sm">
               <Baby className="h-5 w-5" strokeWidth={2.25} />
             </span>
@@ -277,7 +289,7 @@ export function AppShell() {
           <div className="absolute bottom-0 left-0 top-0 flex h-full max-w-[300px] flex-col bg-[var(--color-sidebar)] shadow-2xl">
             <div className="flex items-center justify-between border-b px-4 py-4">
               <Link
-                to="/"
+                to="/dashboard"
                 className="flex items-center gap-2 font-bold"
                 onClick={() => setMobileOpen(false)}
               >
@@ -349,7 +361,7 @@ export function AppShell() {
             >
               <Menu className="h-5 w-5" />
             </button>
-            <Link to="/" className="font-bold text-[var(--color-primary)] md:hidden">
+            <Link to="/dashboard" className="font-bold text-[var(--color-primary)] md:hidden">
               {APP_NAME}
             </Link>
           </div>

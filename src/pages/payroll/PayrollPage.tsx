@@ -24,7 +24,6 @@ import {
 import { AdvanceRepaymentsPeriodCard } from '@/components/payroll/AdvanceRepaymentsPeriodCard'
 import { PayPeriodHistoryCard } from '@/components/payroll/PayPeriodHistoryCard'
 import { PayrollHoursBreakdownDialog } from '@/components/payroll/PayrollHoursBreakdownDialog'
-import { GustoPayrollCard } from '@/components/payroll/GustoPayrollCard'
 import { PayReportingBreakdown } from '@/components/payroll/PayReportingBreakdown'
 import { PaymentAdvancesCard } from '@/components/payroll/PaymentAdvancesCard'
 import {
@@ -271,11 +270,11 @@ export function PayrollPage() {
       qc.invalidateQueries({ queryKey: ['pay_period_closes'] })
       toast.success(
         recordedRepayments
-          ? 'Pay period closed and advance repayments recorded'
-          : 'Pay period closed',
+          ? 'Period finalized and advance repayments recorded'
+          : 'Pay period finalized',
       )
     },
-    onError: () => toast.error('Failed to close period'),
+    onError: () => toast.error('Failed to finalize period'),
   })
 
   function handleHoursBasisChange(v: HoursBasis) {
@@ -341,11 +340,11 @@ export function PayrollPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Payroll"
+        title="Earnings"
         subtitle={
           isDeactivated
             ? 'Historical pay periods and exports for your time with this family'
-            : 'Preview pay from scheduled or actual hours, bonuses, mileage, and advances'
+            : 'Track what your nanny earned from hours, bonuses, mileage, and advances — payments handled separately'
         }
       />
 
@@ -403,7 +402,7 @@ export function PayrollPage() {
               <span className="text-sm">
                 <span className="font-medium">Auto-record advance repayments</span>
                 <span className="mt-0.5 block text-[var(--color-muted-foreground)]">
-                  When closing this pay period, save suggested repayments to the advance ledger
+                  When you finalize this pay period, save suggested repayments to the advance ledger
                   automatically.
                 </span>
               </span>
@@ -414,7 +413,7 @@ export function PayrollPage() {
 
       {!settings ? (
         <p className="text-sm text-[var(--color-muted-foreground)]">
-          No employment settings found. {isParent ? 'Add rates in Settings.' : 'Ask your employer to set up payroll.'}
+          No employment settings found. {isParent ? 'Add rates in Settings.' : 'Ask your employer to set up pay rates.'}
         </p>
       ) : (
         <>
@@ -576,11 +575,11 @@ export function PayrollPage() {
                   disabled={!displaySummary && !periodClose}
                 >
                   <Download className="mr-2 h-4 w-4" />
-                  Export payroll CSV
+                  Export earnings CSV
                 </Button>
                 <Button variant="outline" size="sm" onClick={downloadStub} disabled={!displaySummary && !periodClose}>
                   <FileText className="mr-2 h-4 w-4" />
-                  Download pay stub PDF
+                  Download earnings summary PDF
                 </Button>
                 {isParent && !periodClose && (
                   <Button
@@ -589,7 +588,7 @@ export function PayrollPage() {
                     disabled={closePeriod.isPending || !summary}
                   >
                     <Lock className="mr-2 h-4 w-4" />
-                    {closePeriod.isPending ? 'Closing...' : 'Close pay period'}
+                    {closePeriod.isPending ? 'Finalizing...' : 'Finalize period'}
                   </Button>
                 )}
               </div>
@@ -604,7 +603,7 @@ export function PayrollPage() {
                   ) : settings.auto_record_advance_repayments ? (
                     <p className="text-sm text-[var(--color-muted-foreground)]">
                       Suggested repayments ({formatCurrency(summary.advanceDeductionCents)}) will be
-                      recorded automatically when you close this pay period. You can still record them
+                      recorded automatically when you finalize this pay period. You can still record them
                       now if needed.
                       <Button
                         variant="outline"
@@ -628,23 +627,6 @@ export function PayrollPage() {
               )}
             </CardContent>
           </Card>
-
-          {isParent && periodClose && householdNannyId && (
-            <GustoPayrollCard
-              payPeriodCloseId={periodClose.id}
-              householdNannyId={householdNannyId}
-              employmentType={settings.employment_type}
-              payReportingMode={settings.pay_reporting_mode}
-            />
-          )}
-
-          {periodClose?.paid_at && (
-            <p className="text-sm text-green-700 dark:text-green-400">
-              Marked paid {format(new Date(periodClose.paid_at), 'MMM d, yyyy h:mm a')}
-              {periodClose.paid_amount_cents != null &&
-                ` · ${formatCurrency(periodClose.paid_amount_cents)}`}
-            </p>
-          )}
 
           {isParent && householdNannyId && periodStartStr && (
             <PayrollLineItemsCard

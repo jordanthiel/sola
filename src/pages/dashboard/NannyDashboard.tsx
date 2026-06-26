@@ -151,7 +151,7 @@ export function NannyDashboard() {
           </CardHeader>
           <CardContent>
             <Button variant="link" className="h-auto px-0 py-0 text-xs" asChild>
-              <Link to="/payroll">Payroll details →</Link>
+              <Link to="/payroll">Earnings details →</Link>
             </Button>
           </CardContent>
         </Card>

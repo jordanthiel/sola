@@ -8,6 +8,7 @@ export type MyHouseholdRow = {
   created_by: string | null
   created_at: string
   updated_at: string
+  onboarding_completed_at: string | null
   member_role: MemberRole
 }
 
@@ -30,6 +31,7 @@ export function householdFromRow(row: MyHouseholdRow): Household {
     created_by: row.created_by,
     created_at: row.created_at,
     updated_at: row.updated_at,
+    onboarding_completed_at: row.onboarding_completed_at,
   }
 }
 
@@ -57,7 +59,7 @@ export async function fetchClaimedNannyHouseholdAccess(userId: string): Promise<
   const householdIds = [...new Set(rows.map((r) => r.household_id))]
   const { data: householdRows, error: householdError } = await supabase
     .from('households')
-    .select('id, name, timezone, created_by, created_at, updated_at')
+    .select('id, name, timezone, created_by, created_at, updated_at, onboarding_completed_at')
     .in('id', householdIds)
 
   if (householdError) {
@@ -78,6 +80,7 @@ export async function fetchClaimedNannyHouseholdAccess(userId: string): Promise<
       timezone: 'America/New_York',
       created_by: null,
       created_at: new Date(0).toISOString(),
+      onboarding_completed_at: new Date(0).toISOString(),
       updated_at: new Date(0).toISOString(),
     }
 
@@ -94,6 +97,7 @@ export async function fetchClaimedNannyHouseholdAccess(userId: string): Promise<
           created_by: household.created_by,
           created_at: household.created_at,
           updated_at: household.updated_at,
+          onboarding_completed_at: household.onboarding_completed_at,
           member_role: 'nanny',
         },
         userId,
