@@ -145,6 +145,11 @@ function DayBreakdown({ day }: { day: DailyHoursRow }) {
                   Template
                 </Badge>
               )}
+              {shift.isOvernight && (
+                <Badge variant="secondary" className="shrink-0 text-[10px] px-1.5 py-0">
+                  Overnight
+                </Badge>
+              )}
             </span>
             <span className="shrink-0 tabular-nums">{formatHours(shift.minutes)}</span>
           </li>

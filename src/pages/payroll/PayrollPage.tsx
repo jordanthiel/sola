@@ -15,6 +15,7 @@ import {
   useScheduleBlocks,
   useScheduleTemplates,
   useTimeEntries,
+  useTimeOffRequests,
 } from '@/hooks/useHouseholdData'
 import {
   usePayPeriodClose,
@@ -97,6 +98,7 @@ export function PayrollPage() {
   const { data: advances } = usePaymentAdvances(householdNannyId)
   const { data: advanceRepayments } = useAdvanceRepayments(householdNannyId)
   const { data: timeEntries } = useTimeEntries(from, to, householdNannyId)
+  const { data: timeOffRequests } = useTimeOffRequests()
   const { data: lineItems } = usePayrollLineItems(householdNannyId, periodStartStr)
   const { data: periodClose } = usePayPeriodClose(householdNannyId, periodStartStr)
   const { data: closes } = usePayPeriodCloses(householdNannyId)
@@ -130,7 +132,7 @@ export function PayrollPage() {
         : []
 
     const actualShifts = timeEntries?.length
-      ? timeEntriesToPayableShifts(timeEntries)
+      ? timeEntriesToPayableShifts(timeEntries, blocks ?? [])
       : scheduledShifts
 
     return hoursBasis === 'actual' ? actualShifts : scheduledShifts
@@ -146,8 +148,9 @@ export function PayrollPage() {
       period.end,
       advances ?? [],
       lineItems ?? [],
+      timeOffRequests ?? [],
     )
-  }, [settings, period, householdNannyId, advances, lineItems, payableShifts])
+  }, [settings, period, householdNannyId, advances, lineItems, payableShifts, timeOffRequests])
 
   const displaySummary = useMemo(() => {
     if (isDeactivated && periodClose?.snapshot) {
@@ -484,6 +487,14 @@ export function PayrollPage() {
                     ) : undefined
                   }
                 />
+                <Stat
+                  label="Overnight premium"
+                  value={displaySummary ? formatCurrency(displaySummary.overnightPayCents) : '—'}
+                />
+                <Stat
+                  label="Vacation pay"
+                  value={displaySummary ? formatCurrency(displaySummary.vacationPayCents) : '—'}
+                />
                 <Stat label="Gross pay" value={displaySummary ? formatCurrency(displaySummary.grossPayCents) : '—'} />
                 <Stat
                   label="Line items"
@@ -535,7 +546,11 @@ export function PayrollPage() {
               {displaySummary && (
                 <PayReportingBreakdown
                   reporting={displaySummary.reporting}
-                  regularPayCents={displaySummary.regularPayCents}
+                  regularPayCents={
+                    displaySummary.regularPayCents +
+                    displaySummary.overnightPayCents +
+                    displaySummary.vacationPayCents
+                  }
                   overtimePayCents={displaySummary.overtimePayCents}
                   lineItemsTotalCents={displaySummary.lineItemsTotalCents}
                   arrangementLabel={payReportingExtras.payReportingLabel}

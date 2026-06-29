@@ -34,6 +34,14 @@ export function PendingTimeOffApprovals({
                   {format(parseISO(r.starts_on + 'T12:00:00'), 'MMM d')} –{' '}
                   {format(parseISO(r.ends_on + 'T12:00:00'), 'MMM d, yyyy')} · {r.hours}h
                 </p>
+                {r.type === 'vacation' && r.nanny_joins_vacation && (
+                  <p className="text-sm text-[var(--color-muted-foreground)]">
+                    Nanny joins
+                    {r.vacation_daily_rate_cents
+                      ? ` · $${(r.vacation_daily_rate_cents / 100).toFixed(2)}/day`
+                      : ' · default vacation rate'}
+                  </p>
+                )}
                 {r.notes && (
                   <p className="text-sm text-[var(--color-muted-foreground)]">
                     <span className="font-medium text-[var(--color-foreground)]">Request note:</span>{' '}

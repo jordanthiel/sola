@@ -24,6 +24,10 @@ export function NannyEmploymentSettings({ householdNannyId }: { householdNannyId
   const [payReportingMode, setPayReportingMode] = useState<PayReportingMode>('all_over')
   const [overTablePercent, setOverTablePercent] = useState('100')
   const [autoRecordAdvanceRepayments, setAutoRecordAdvanceRepayments] = useState(false)
+  const [overnightRate, setOvernightRate] = useState('')
+  const [overnightStartTime, setOvernightStartTime] = useState('22:00')
+  const [overnightEndTime, setOvernightEndTime] = useState('06:00')
+  const [vacationDailyRate, setVacationDailyRate] = useState('')
 
   const current = employment?.[0]
 
@@ -38,6 +42,16 @@ export function NannyEmploymentSettings({ householdNannyId }: { householdNannyId
     setPayReportingMode(current.pay_reporting_mode ?? 'all_over')
     setOverTablePercent(String(current.over_table_percent ?? 100))
     setAutoRecordAdvanceRepayments(current.auto_record_advance_repayments ?? false)
+    setOvernightRate(
+      current.overnight_rate_cents == null ? '' : (current.overnight_rate_cents / 100).toFixed(2),
+    )
+    setOvernightStartTime((current.overnight_start_time ?? '22:00').slice(0, 5))
+    setOvernightEndTime((current.overnight_end_time ?? '06:00').slice(0, 5))
+    setVacationDailyRate(
+      current.vacation_daily_rate_cents == null
+        ? ''
+        : (current.vacation_daily_rate_cents / 100).toFixed(2),
+    )
   }, [
     current?.id,
     current?.hourly_rate_cents,
@@ -49,6 +63,10 @@ export function NannyEmploymentSettings({ householdNannyId }: { householdNannyId
     current?.pay_reporting_mode,
     current?.over_table_percent,
     current?.auto_record_advance_repayments,
+    current?.overnight_rate_cents,
+    current?.overnight_start_time,
+    current?.overnight_end_time,
+    current?.vacation_daily_rate_cents,
     householdNannyId,
   ])
 
@@ -56,6 +74,10 @@ export function NannyEmploymentSettings({ householdNannyId }: { householdNannyId
     mutationFn: async () => {
       const cents = Math.round(parseFloat(hourlyRate) * 100)
       const pct = Math.min(100, Math.max(0, parseFloat(overTablePercent) || 0))
+      const overnightCents =
+        overnightRate.trim() === '' ? null : Math.round(parseFloat(overnightRate) * 100)
+      const vacationCents =
+        vacationDailyRate.trim() === '' ? null : Math.round(parseFloat(vacationDailyRate) * 100)
       const effectiveFrom = new Date().toISOString().split('T')[0]
       const payload = {
         hourly_rate_cents: cents,
@@ -72,6 +94,12 @@ export function NannyEmploymentSettings({ householdNannyId }: { householdNannyId
               ? 0
               : 100,
         auto_record_advance_repayments: autoRecordAdvanceRepayments,
+        overnight_rate_cents:
+          overnightCents !== null && Number.isFinite(overnightCents) ? overnightCents : null,
+        overnight_start_time: overnightStartTime || '22:00',
+        overnight_end_time: overnightEndTime || '06:00',
+        vacation_daily_rate_cents:
+          vacationCents !== null && Number.isFinite(vacationCents) ? vacationCents : null,
       }
 
       const existingToday = employment?.find((e) => e.effective_from === effectiveFrom)
@@ -171,6 +199,63 @@ export function NannyEmploymentSettings({ householdNannyId }: { householdNannyId
 
       <div className="space-y-4 rounded-lg border p-4">
         <div>
+          <h4 className="font-medium">Overnight & vacation pay</h4>
+          <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">
+            Set the default overnight pay window and the daily rate used when the nanny joins family
+            vacation days on the calendar.
+          </p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="overnight-rate">Overnight hourly rate ($)</Label>
+            <Input
+              id="overnight-rate"
+              type="number"
+              step="0.01"
+              value={overnightRate}
+              onChange={(e) => setOvernightRate(e.target.value)}
+              placeholder="Optional"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="vacation-daily-rate">Vacation daily rate ($)</Label>
+            <Input
+              id="vacation-daily-rate"
+              type="number"
+              step="0.01"
+              value={vacationDailyRate}
+              onChange={(e) => setVacationDailyRate(e.target.value)}
+              placeholder="Optional"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="overnight-start">Overnight starts</Label>
+            <Input
+              id="overnight-start"
+              type="time"
+              value={overnightStartTime}
+              onChange={(e) => setOvernightStartTime(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="overnight-end">Overnight ends</Label>
+            <Input
+              id="overnight-end"
+              type="time"
+              value={overnightEndTime}
+              onChange={(e) => setOvernightEndTime(e.target.value)}
+            />
+          </div>
+        </div>
+        <p className="text-xs text-[var(--color-muted-foreground)]">
+          Overnight pay is added as the difference between the normal hourly rate and the overnight
+          rate for hours inside the overnight window. Vacation pay applies to approved Vacation
+          calendar days where the nanny joins.
+        </p>
+      </div>
+
+      <div className="space-y-4 rounded-lg border p-4">
+        <div>
           <h4 className="font-medium">How pay is reported</h4>
           <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">
             Choose whether wages are paid on the books (reported for taxes) or off the books (cash /
@@ -242,6 +327,10 @@ export function NannyEmploymentSettings({ householdNannyId }: { householdNannyId
           Current: ${(current.hourly_rate_cents / 100).toFixed(2)}/hr ·{' '}
           {current.standard_hours_per_week}h standard · {current.pay_period} pay ·{' '}
           {current.overtime_multiplier}× OT
+          {current.overnight_rate_cents != null &&
+            ` · overnight $${(current.overnight_rate_cents / 100).toFixed(2)}/hr`}
+          {current.vacation_daily_rate_cents != null &&
+            ` · vacation $${(current.vacation_daily_rate_cents / 100).toFixed(2)}/day`}
           {reportingSummary && <> · {reportingSummary}</>}
         </p>
       )}

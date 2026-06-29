@@ -20,6 +20,10 @@ export function useCalendarMutations() {
       startsAt: Date
       endsAt: Date
       notes: string | null
+      isOvernight?: boolean
+      overnightRateCents?: number | null
+      overnightStartTime?: string | null
+      overnightEndTime?: string | null
     }) => {
       const { error } = await supabase.rpc('upsert_schedule_day', {
         p_household_id: activeHousehold!.id,
@@ -28,6 +32,10 @@ export function useCalendarMutations() {
         p_starts_at: input.startsAt.toISOString(),
         p_ends_at: input.endsAt.toISOString(),
         p_notes: input.notes,
+        p_is_overnight: input.isOvernight ?? false,
+        p_overnight_rate_cents: input.overnightRateCents ?? null,
+        p_overnight_start_time: input.overnightStartTime ?? null,
+        p_overnight_end_time: input.overnightEndTime ?? null,
       })
       if (error) throw error
     },
@@ -88,6 +96,9 @@ export function useCalendarMutations() {
       endsOn: string
       hours: number
       notes: string | null
+      status?: 'pending' | 'approved'
+      nannyJoinsVacation?: boolean
+      vacationDailyRateCents?: number | null
     }) => {
       const { error } = await supabase.from('time_off_requests').insert({
         household_id: activeHousehold!.id,
@@ -97,6 +108,9 @@ export function useCalendarMutations() {
         ends_on: input.endsOn,
         hours: input.hours,
         notes: input.notes,
+        status: input.status ?? 'pending',
+        nanny_joins_vacation: input.nannyJoinsVacation ?? false,
+        vacation_daily_rate_cents: input.vacationDailyRateCents ?? null,
       })
       if (error) throw error
     },
@@ -111,6 +125,8 @@ export function useCalendarMutations() {
       endsOn: string
       hours: number
       notes: string | null
+      nannyJoinsVacation?: boolean
+      vacationDailyRateCents?: number | null
     }) => {
       const { error } = await supabase
         .from('time_off_requests')
@@ -120,6 +136,8 @@ export function useCalendarMutations() {
           ends_on: input.endsOn,
           hours: input.hours,
           notes: input.notes,
+          nanny_joins_vacation: input.nannyJoinsVacation ?? false,
+          vacation_daily_rate_cents: input.vacationDailyRateCents ?? null,
         })
         .eq('id', input.id)
       if (error) throw error

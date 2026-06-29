@@ -57,9 +57,15 @@ import { DialogFooter } from '@/components/ui/dialog'
 import { selectCn } from '@/lib/utils'
 
 const MOODS: MoodType[] = ['happy', 'calm', 'fussy', 'tired', 'sick']
-const TIME_OFF_TYPES: TimeOffType[] = ['sick', 'pto', 'unpaid']
+const TIME_OFF_TYPES: TimeOffType[] = ['sick', 'pto', 'unpaid', 'vacation']
 
 const selectClass = 'flex h-10 w-full rounded-md border border-[var(--color-border)] bg-transparent px-3 text-sm'
+
+function currencyToCents(value: string): number | null {
+  if (value.trim() === '') return null
+  const parsed = parseFloat(value)
+  return Number.isFinite(parsed) ? Math.round(parsed * 100) : null
+}
 
 export function CalendarEventForm({
   state,
@@ -86,6 +92,8 @@ export function CalendarEventForm({
   const qc = useQueryClient()
   const isCreate = state.mode === 'create'
   const event = state.mode !== 'create' ? state.event : null
+  const scheduleBlock =
+    event?.scheduleItem && !isTemplateOccurrence(event.scheduleItem) ? event.scheduleItem : null
 
   const defaultKind: CalendarEventKind =
     state.mode === 'create'
@@ -110,6 +118,18 @@ export function CalendarEventForm({
     event ? toTimeInputValue(event.endsAt) : draft ? toTimeInputValue(draft.endsAt) : '17:00',
   )
   const [notes, setNotes] = useState(event?.description ?? event?.subtitle ?? '')
+  const [isOvernightShift, setIsOvernightShift] = useState(scheduleBlock?.is_overnight ?? false)
+  const [shiftOvernightRate, setShiftOvernightRate] = useState(
+    scheduleBlock?.overnight_rate_cents == null
+      ? ''
+      : (scheduleBlock.overnight_rate_cents / 100).toFixed(2),
+  )
+  const [shiftOvernightStartTime, setShiftOvernightStartTime] = useState(
+    scheduleBlock?.overnight_start_time?.slice(0, 5) ?? '',
+  )
+  const [shiftOvernightEndTime, setShiftOvernightEndTime] = useState(
+    scheduleBlock?.overnight_end_time?.slice(0, 5) ?? '',
+  )
 
   const [timeOffType, setTimeOffType] = useState<TimeOffType>(event?.timeOffType ?? 'pto')
   const [startsOn, setStartsOn] = useState(
@@ -119,6 +139,14 @@ export function CalendarEventForm({
     event ? toDateInputValue(event.endsAt) : toDateInputValue(baseDay),
   )
   const [hours, setHours] = useState(String(event?.timeOffHours ?? 8))
+  const [nannyJoinsVacation, setNannyJoinsVacation] = useState(
+    event?.timeOffNannyJoinsVacation ?? false,
+  )
+  const [vacationDailyRate, setVacationDailyRate] = useState(
+    event?.timeOffVacationRateCents == null
+      ? ''
+      : (event.timeOffVacationRateCents / 100).toFixed(2),
+  )
 
   const [selectedChildIds, setSelectedChildIds] = useState<string[]>(
     event?.childId ? [event.childId] : [],
@@ -166,6 +194,21 @@ export function CalendarEventForm({
     setKind(defaultKind)
     setError('')
     const ev = state.mode !== 'create' ? state.event : null
+    const block =
+      ev?.scheduleItem && !isTemplateOccurrence(ev.scheduleItem) ? ev.scheduleItem : null
+    setNotes(ev?.description ?? ev?.subtitle ?? '')
+    setIsOvernightShift(block?.is_overnight ?? false)
+    setShiftOvernightRate(
+      block?.overnight_rate_cents == null ? '' : (block.overnight_rate_cents / 100).toFixed(2),
+    )
+    setShiftOvernightStartTime(block?.overnight_start_time?.slice(0, 5) ?? '')
+    setShiftOvernightEndTime(block?.overnight_end_time?.slice(0, 5) ?? '')
+    setTimeOffType(ev?.timeOffType ?? 'pto')
+    setHours(String(ev?.timeOffHours ?? 8))
+    setNannyJoinsVacation(ev?.timeOffNannyJoinsVacation ?? false)
+    setVacationDailyRate(
+      ev?.timeOffVacationRateCents == null ? '' : (ev.timeOffVacationRateCents / 100).toFixed(2),
+    )
     setSelectedChildIds(ev?.childId ? [ev.childId] : [])
     if (ev) {
       setPlanAttendee(
@@ -213,6 +256,10 @@ export function CalendarEventForm({
       ? ['time_off', 'activity']
       : ['activity']
 
+  const timeOffTypeOptions = isParent
+    ? TIME_OFF_TYPES
+    : TIME_OFF_TYPES.filter((t) => t !== 'vacation')
+
   async function handleSave() {
     setError('')
     setSaving(true)
@@ -234,10 +281,16 @@ export function CalendarEventForm({
           startsAt,
           endsAt,
           notes: notes.trim() || null,
+          isOvernight: isOvernightShift,
+          overnightRateCents: isOvernightShift ? currencyToCents(shiftOvernightRate) : null,
+          overnightStartTime: isOvernightShift ? shiftOvernightStartTime || null : null,
+          overnightEndTime: isOvernightShift ? shiftOvernightEndTime || null : null,
         })
       } else if (kind === 'time_off') {
         const nid = isNanny ? myNannyId : nannyId
         if (!nid) throw new Error('Nanny profile required')
+        const isVacation = timeOffType === 'vacation'
+        const vacationRateCents = isVacation ? currencyToCents(vacationDailyRate) : null
         if (isCreate) {
           await mutations.createTimeOff.mutateAsync({
             householdNannyId: nid,
@@ -246,6 +299,9 @@ export function CalendarEventForm({
             endsOn,
             hours: parseFloat(hours),
             notes: notes.trim() || null,
+            status: isParent ? 'approved' : 'pending',
+            nannyJoinsVacation: isVacation ? nannyJoinsVacation : false,
+            vacationDailyRateCents: vacationRateCents,
           })
         } else if (event?.sourceId) {
           await mutations.updateTimeOff.mutateAsync({
@@ -255,6 +311,8 @@ export function CalendarEventForm({
             endsOn,
             hours: parseFloat(hours),
             notes: notes.trim() || null,
+            nannyJoinsVacation: isVacation ? nannyJoinsVacation : false,
+            vacationDailyRateCents: vacationRateCents,
           })
         }
       } else {
@@ -406,6 +464,53 @@ export function CalendarEventForm({
               <TimePicker value={endTime} onChange={setEndTime} />
             </fieldset>
           </section>
+          <fieldset className="space-y-3 rounded-md border p-3">
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={isOvernightShift}
+                onChange={(e) => setIsOvernightShift(e.target.checked)}
+              />
+              <span>
+                <span className="font-medium">Overnight stay</span>
+                <span className="mt-0.5 block text-sm text-[var(--color-muted-foreground)]">
+                  Use overnight pay settings for this shift. Optional overrides below apply only to
+                  this calendar day.
+                </span>
+              </span>
+            </label>
+            {isOvernightShift && (
+              <div className="grid gap-3 md:grid-cols-3">
+                <div className="space-y-2">
+                  <Label>Overnight rate ($/hr)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={shiftOvernightRate}
+                    onChange={(e) => setShiftOvernightRate(e.target.value)}
+                    placeholder="Use default"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Overnight starts</Label>
+                  <Input
+                    type="time"
+                    value={shiftOvernightStartTime}
+                    onChange={(e) => setShiftOvernightStartTime(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Overnight ends</Label>
+                  <Input
+                    type="time"
+                    value={shiftOvernightEndTime}
+                    onChange={(e) => setShiftOvernightEndTime(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+          </fieldset>
           <fieldset className="space-y-2">
             <Label>Notes</Label>
             <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
@@ -434,9 +539,9 @@ export function CalendarEventForm({
               value={timeOffType}
               onChange={(e) => setTimeOffType(e.target.value as TimeOffType)}
             >
-              {TIME_OFF_TYPES.map((t) => (
+              {timeOffTypeOptions.map((t) => (
                 <option key={t} value={t}>
-                  {t}
+                  {t === 'pto' ? 'PTO' : t.charAt(0).toUpperCase() + t.slice(1)}
                 </option>
               ))}
             </select>
@@ -452,9 +557,39 @@ export function CalendarEventForm({
             </fieldset>
           </section>
           <fieldset className="space-y-2">
-            <Label>Hours</Label>
+            <Label>{timeOffType === 'vacation' ? 'Hours (for records)' : 'Hours'}</Label>
             <Input type="number" step="0.5" value={hours} onChange={(e) => setHours(e.target.value)} />
           </fieldset>
+          {timeOffType === 'vacation' && (
+            <fieldset className="space-y-3 rounded-md border p-3">
+              <label className="flex cursor-pointer items-start gap-3">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={nannyJoinsVacation}
+                  onChange={(e) => setNannyJoinsVacation(e.target.checked)}
+                />
+                <span>
+                  <span className="font-medium">Nanny joins this vacation</span>
+                  <span className="mt-0.5 block text-sm text-[var(--color-muted-foreground)]">
+                    Approved vacation days with a daily rate are included in payroll for the period.
+                  </span>
+                </span>
+              </label>
+              {nannyJoinsVacation && (
+                <div className="space-y-2">
+                  <Label>Vacation rate ($/day)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={vacationDailyRate}
+                    onChange={(e) => setVacationDailyRate(e.target.value)}
+                    placeholder="Use nanny default"
+                  />
+                </div>
+              )}
+            </fieldset>
+          )}
           <fieldset className="space-y-2">
             <Label>Notes</Label>
             <Input value={notes} onChange={(e) => setNotes(e.target.value)} />

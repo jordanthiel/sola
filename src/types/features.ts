@@ -157,8 +157,12 @@ export interface PayrollSnapshot {
   totalMinutes: number
   regularMinutes: number
   overtimeMinutes: number
+  overnightMinutes?: number
   regularPayCents: number
   overtimePayCents: number
+  overnightPayCents?: number
+  vacationDays?: number
+  vacationPayCents?: number
   grossPayCents: number
   lineItemsTotalCents: number
   advanceDeductionCents: number
