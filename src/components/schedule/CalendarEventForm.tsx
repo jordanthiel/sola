@@ -272,7 +272,7 @@ export function CalendarEventForm({
         if (!isParent) throw new Error('Only parents can manage shifts')
         if (!nannyId) throw new Error('Select a nanny')
         const day = new Date(workDate + 'T12:00:00')
-        let startsAt = combineDateAndTime(day, startTime)
+        const startsAt = combineDateAndTime(day, startTime)
         let endsAt = combineDateAndTime(day, endTime)
         if (endsAt <= startsAt) endsAt = addHours(endsAt, 24)
         await mutations.upsertShift.mutateAsync({
