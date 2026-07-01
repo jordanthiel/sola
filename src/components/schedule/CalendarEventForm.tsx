@@ -130,6 +130,9 @@ export function CalendarEventForm({
   const [shiftOvernightEndTime, setShiftOvernightEndTime] = useState(
     scheduleBlock?.overnight_end_time?.slice(0, 5) ?? '',
   )
+  const [holidayWorked, setHolidayWorked] = useState(
+    scheduleBlock?.holiday_worked ?? draft?.holidayWorked ?? false,
+  )
 
   const [timeOffType, setTimeOffType] = useState<TimeOffType>(event?.timeOffType ?? 'pto')
   const [startsOn, setStartsOn] = useState(
@@ -203,6 +206,7 @@ export function CalendarEventForm({
     )
     setShiftOvernightStartTime(block?.overnight_start_time?.slice(0, 5) ?? '')
     setShiftOvernightEndTime(block?.overnight_end_time?.slice(0, 5) ?? '')
+    setHolidayWorked(block?.holiday_worked ?? (state.mode === 'create' ? state.draft?.holidayWorked ?? false : false))
     setTimeOffType(ev?.timeOffType ?? 'pto')
     setHours(String(ev?.timeOffHours ?? 8))
     setNannyJoinsVacation(ev?.timeOffNannyJoinsVacation ?? false)
@@ -285,6 +289,7 @@ export function CalendarEventForm({
           overnightRateCents: isOvernightShift ? currencyToCents(shiftOvernightRate) : null,
           overnightStartTime: isOvernightShift ? shiftOvernightStartTime || null : null,
           overnightEndTime: isOvernightShift ? shiftOvernightEndTime || null : null,
+          holidayWorked,
         })
       } else if (kind === 'time_off') {
         const nid = isNanny ? myNannyId : nannyId
@@ -510,6 +515,23 @@ export function CalendarEventForm({
                 </div>
               </div>
             )}
+          </fieldset>
+          <fieldset className="space-y-3 rounded-md border p-3">
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={holidayWorked}
+                onChange={(e) => setHolidayWorked(e.target.checked)}
+              />
+              <span>
+                <span className="font-medium">Nanny actually worked this holiday</span>
+                <span className="mt-0.5 block text-sm text-[var(--color-muted-foreground)]">
+                  If this date is a paid holiday, these shift hours count toward the period total and
+                  overtime threshold in addition to the automatic full-day holiday hours.
+                </span>
+              </span>
+            </label>
           </fieldset>
           <fieldset className="space-y-2">
             <Label>Notes</Label>

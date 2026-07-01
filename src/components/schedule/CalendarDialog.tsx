@@ -26,12 +26,14 @@ const KIND_LABELS = {
 export function CalendarDialog({
   state,
   onClose,
+  onCreateHolidayShift,
   nannies,
   childrenList,
   scheduleItems,
 }: {
   state: CalendarDialogState | null
   onClose: () => void
+  onCreateHolidayShift?: (day: Date) => void
   nannies: HouseholdNanny[] | undefined
   childrenList: Child[] | undefined
   scheduleItems?: ScheduleCoverageItem[]
@@ -47,6 +49,7 @@ export function CalendarDialog({
           <CalendarDialogInner
             state={state}
             onClose={onClose}
+            onCreateHolidayShift={onCreateHolidayShift}
             nannies={nannies}
             childrenList={childrenList}
             scheduleItems={scheduleItems}
@@ -62,6 +65,7 @@ export function CalendarDialog({
 function CalendarDialogInner({
   state,
   onClose,
+  onCreateHolidayShift,
   nannies,
   childrenList,
   scheduleItems,
@@ -70,6 +74,7 @@ function CalendarDialogInner({
 }: {
   state: CalendarDialogState
   onClose: () => void
+  onCreateHolidayShift?: (day: Date) => void
   nannies: HouseholdNanny[] | undefined
   childrenList: Child[] | undefined
   scheduleItems?: ScheduleCoverageItem[]
@@ -113,6 +118,11 @@ function CalendarDialogInner({
           }}
           onReportLate={
             isNanny && event.kind === 'shift' ? () => setMode('edit') : undefined
+          }
+          onAddHolidayShift={
+            isParent && event.kind === 'holiday' && onCreateHolidayShift
+              ? () => onCreateHolidayShift(event.startsAt)
+              : undefined
           }
           onClose={onClose}
           mutations={mutations}

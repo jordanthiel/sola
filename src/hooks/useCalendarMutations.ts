@@ -24,6 +24,7 @@ export function useCalendarMutations() {
       overnightRateCents?: number | null
       overnightStartTime?: string | null
       overnightEndTime?: string | null
+      holidayWorked?: boolean
     }) => {
       const { error } = await supabase.rpc('upsert_schedule_day', {
         p_household_id: activeHousehold!.id,
@@ -36,6 +37,7 @@ export function useCalendarMutations() {
         p_overnight_rate_cents: input.overnightRateCents ?? null,
         p_overnight_start_time: input.overnightStartTime ?? null,
         p_overnight_end_time: input.overnightEndTime ?? null,
+        p_holiday_worked: input.holidayWorked ?? false,
       })
       if (error) throw error
     },

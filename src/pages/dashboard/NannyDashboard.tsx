@@ -22,6 +22,7 @@ import {
   useTimeOffRequests,
 } from '@/hooks/useHouseholdData'
 import { useFeedPosts, useMyNannyHouseholds } from '@/hooks/useExtendedFeatures'
+import { useHouseholdHolidays } from '@/hooks/useHouseholdHolidays'
 import { useExtendedChildren } from '@/hooks/useExtendedFeatures'
 import {
   blockHasLateReport,
@@ -68,6 +69,7 @@ export function NannyDashboard() {
   const { data: children } = useExtendedChildren()
   const { data: feed } = useFeedPosts()
   const { data: activities } = useChildActivities()
+  const { data: holidayOverrides } = useHouseholdHolidays()
 
   const myPto = ptoBalances?.find((b) => b.household_nanny_id === myNanny?.id)
   const pendingOff = timeOff?.filter((t) => t.status === 'pending').length ?? 0
@@ -93,8 +95,16 @@ export function NannyDashboard() {
       period.start,
       period.end,
     )
-    return calculatePayroll(shifts, settings, period.start, period.end, [])
-  }, [settings, weekBlocks, templates, period, myNanny])
+    return calculatePayroll(
+      shifts,
+      settings,
+      period.start,
+      period.end,
+      [],
+      [],
+      holidayOverrides ?? [],
+    )
+  }, [settings, weekBlocks, templates, period, myNanny, holidayOverrides])
 
   const myUpcoming = useMemo(() => {
     if (!upcomingBlocks || !myNanny) return []

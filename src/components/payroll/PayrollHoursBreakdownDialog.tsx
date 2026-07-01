@@ -1,6 +1,7 @@
 import { Info } from 'lucide-react'
 import type { EmploymentSetting } from '@/types/database'
 import type { HoursBasis } from '@/types/features'
+import type { HolidayPayItem } from '@/lib/payroll'
 import {
   buildDailyHoursBreakdown,
   payPeriodWeeksLabel,
@@ -35,6 +36,7 @@ export function PayrollHoursBreakdownDialog({
   totalMinutes,
   regularMinutes,
   overtimeMinutes,
+  holidayItems = [],
   hoursBasis,
   periodLabel,
 }: {
@@ -44,11 +46,18 @@ export function PayrollHoursBreakdownDialog({
   totalMinutes: number
   regularMinutes: number
   overtimeMinutes: number
+  holidayItems?: HolidayPayItem[]
   hoursBasis: HoursBasis
   periodLabel: string
 }) {
-  const days = buildDailyHoursBreakdown(shifts)
+  const holidayDates = new Set(holidayItems.map((item) => item.date))
+  const countedShifts = shifts.filter((shift) => {
+    const date = shift.starts_at.split('T')[0]
+    return !holidayDates.has(date) || shift.holiday_worked
+  })
+  const days = buildDailyHoursBreakdown(countedShifts)
   const thresholdMinutes = periodThresholdMinutes(settings)
+  const holidayMinutes = holidayItems.reduce((sum, item) => sum + item.minutes, 0)
 
   return (
     <Dialog>
@@ -72,16 +81,33 @@ export function PayrollHoursBreakdownDialog({
         </DialogHeader>
 
         <div className="space-y-4">
-          {days.length === 0 ? (
+          {days.length === 0 && holidayItems.length === 0 ? (
             <p className="text-sm text-[var(--color-muted-foreground)]">
               No payable shifts in this pay period for the selected hours basis.
             </p>
-          ) : (
+          ) : days.length > 0 ? (
             <ul className="divide-y rounded-lg border">
               {days.map((day) => (
                 <DayBreakdown key={day.date} day={day} />
               ))}
             </ul>
+          ) : null}
+
+          {holidayItems.length > 0 && (
+            <div className="rounded-lg border bg-[var(--color-muted)]/30 p-3">
+              <p className="text-sm font-medium">Paid holidays</p>
+              <ul className="mt-2 space-y-1.5">
+                {holidayItems.map((holiday) => (
+                  <li
+                    key={holiday.id}
+                    className="flex items-center justify-between gap-2 text-sm text-[var(--color-muted-foreground)]"
+                  >
+                    <span>{holiday.name}</span>
+                    <span className="shrink-0 tabular-nums">{formatHours(holiday.minutes)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
 
           <div className="rounded-lg bg-[var(--color-muted)]/40 px-3 py-2 text-sm">
@@ -93,7 +119,7 @@ export function PayrollHoursBreakdownDialog({
               <p className="mt-2 text-[var(--color-muted-foreground)]">
                 Regular time is capped at {formatHours(thresholdMinutes)} for this period (
                 {settings.standard_hours_per_week} hrs/week × {payPeriodWeeksLabel(settings)}). Of{' '}
-                {formatHours(totalMinutes)} worked, {formatHours(regularMinutes)} count as regular
+                {formatHours(totalMinutes)} payable, {formatHours(regularMinutes)} count as regular
                 {overtimeMinutes > 0 && ` and ${formatHours(overtimeMinutes)} as overtime`}.
               </p>
             )}
@@ -115,7 +141,8 @@ export function PayrollHoursBreakdownDialog({
             )}
             {variant === 'total' && days.length > 0 && (
               <p className="mt-2 text-[var(--color-muted-foreground)]">
-                Sum of {days.length} day{days.length === 1 ? '' : 's'} with recorded work.
+                Sum of {days.length} day{days.length === 1 ? '' : 's'} with recorded work
+                {holidayMinutes > 0 && ` plus ${formatHours(holidayMinutes)} of paid holidays`}.
               </p>
             )}
           </div>

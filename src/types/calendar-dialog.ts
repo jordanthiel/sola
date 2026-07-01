@@ -7,6 +7,7 @@ export interface CalendarSlotDraft {
   startsAt: Date
   endsAt: Date
   allDay?: boolean
+  holidayWorked?: boolean
 }
 
 export type CalendarDialogState =

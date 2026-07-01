@@ -158,6 +158,9 @@ export interface PayrollSnapshot {
   regularMinutes: number
   overtimeMinutes: number
   overnightMinutes?: number
+  holidayMinutes?: number
+  holidayWorkedMinutes?: number
+  holidayPayCents?: number
   regularPayCents: number
   overtimePayCents: number
   overnightPayCents?: number

@@ -160,6 +160,20 @@ export function SchedulePage() {
     setDialogState({ mode: 'create', draft: { day, startsAt, endsAt } })
   }
 
+  function openCreateHolidayShift(dayInput: Date) {
+    const day = startOfDay(dayInput)
+    setDialogState({
+      mode: 'create',
+      kind: 'shift',
+      draft: {
+        day,
+        startsAt: setMinutes(setHours(day, 9), 0),
+        endsAt: setMinutes(setHours(day, 17), 0),
+        holidayWorked: true,
+      },
+    })
+  }
+
   function handleWeekDaySelect(day: Date) {
     setFocusDate(startOfDay(day))
     setViewMode('day')
@@ -253,6 +267,7 @@ export function SchedulePage() {
       <CalendarDialog
         state={dialogState}
         onClose={() => setDialogState(null)}
+        onCreateHolidayShift={openCreateHolidayShift}
         nannies={nannies}
         childrenList={children}
         scheduleItems={merged}

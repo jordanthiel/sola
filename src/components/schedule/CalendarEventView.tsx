@@ -24,6 +24,7 @@ export function CalendarEventView({
   isNanny,
   onEdit,
   onReportLate,
+  onAddHolidayShift,
   onClose,
   mutations,
 }: {
@@ -32,6 +33,7 @@ export function CalendarEventView({
   isNanny: boolean
   onEdit: () => void
   onReportLate?: () => void
+  onAddHolidayShift?: () => void
   onClose: () => void
   mutations: ReturnType<typeof useCalendarMutations>
 }) {
@@ -109,6 +111,11 @@ export function CalendarEventView({
             Worked late
           </Badge>
         )}
+        {event.holidayWorked && (
+          <Badge className="mt-2 ml-1" variant="secondary">
+            Worked holiday
+          </Badge>
+        )}
         {event.isTemplate && (
           <Badge className="mt-2 ml-1" variant="outline">
             Usual day
@@ -127,13 +134,20 @@ export function CalendarEventView({
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       {isHoliday && isParent && (
-        <p className="text-sm text-[var(--color-muted-foreground)]">
-          Change which holidays are off in{' '}
-          <Link to="/settings" className="font-medium text-[var(--color-primary)] underline-offset-2 hover:underline">
-            Settings → Nanny holidays
-          </Link>
-          .
-        </p>
+        <div className="space-y-2 text-sm text-[var(--color-muted-foreground)]">
+          <p>
+            This holiday adds a full paid day automatically in Earnings. If the nanny actually
+            worked, add a shift for the holiday and keep "Nanny actually worked this holiday"
+            checked so those hours count toward overtime.
+          </p>
+          <p>
+            Change which holidays are off in{' '}
+            <Link to="/settings" className="font-medium text-[var(--color-primary)] underline-offset-2 hover:underline">
+              Settings → Nanny holidays
+            </Link>
+            .
+          </p>
+        </div>
       )}
 
       <DialogFooter className="flex-wrap gap-2">
@@ -141,6 +155,11 @@ export function CalendarEventView({
         {isNanny && event.kind === 'shift' && onReportLate && (
           <Button size="sm" variant="outline" onClick={onReportLate}>
             Worked late
+          </Button>
+        )}
+        {isParent && isHoliday && onAddHolidayShift && (
+          <Button size="sm" variant="outline" onClick={onAddHolidayShift}>
+            Add worked shift
           </Button>
         )}
         {canEdit && (

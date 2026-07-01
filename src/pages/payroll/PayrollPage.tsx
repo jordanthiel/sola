@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useHousehold } from '@/contexts/HouseholdContext'
 import { useMyNannyAccess } from '@/hooks/useMyNannyAccess'
+import { useHouseholdHolidays } from '@/hooks/useHouseholdHolidays'
 import {
   useEmploymentSettings,
   useNannies,
@@ -99,6 +100,7 @@ export function PayrollPage() {
   const { data: advanceRepayments } = useAdvanceRepayments(householdNannyId)
   const { data: timeEntries } = useTimeEntries(from, to, householdNannyId)
   const { data: timeOffRequests } = useTimeOffRequests()
+  const { data: holidayOverrides } = useHouseholdHolidays()
   const { data: lineItems } = usePayrollLineItems(householdNannyId, periodStartStr)
   const { data: periodClose } = usePayPeriodClose(householdNannyId, periodStartStr)
   const { data: closes } = usePayPeriodCloses(householdNannyId)
@@ -149,8 +151,18 @@ export function PayrollPage() {
       advances ?? [],
       lineItems ?? [],
       timeOffRequests ?? [],
+      holidayOverrides ?? [],
     )
-  }, [settings, period, householdNannyId, advances, lineItems, payableShifts, timeOffRequests])
+  }, [
+    settings,
+    period,
+    householdNannyId,
+    advances,
+    lineItems,
+    payableShifts,
+    timeOffRequests,
+    holidayOverrides,
+  ])
 
   const displaySummary = useMemo(() => {
     if (isDeactivated && periodClose?.snapshot) {
@@ -445,6 +457,7 @@ export function PayrollPage() {
                         totalMinutes={displaySummary.totalMinutes}
                         regularMinutes={displaySummary.regularMinutes}
                         overtimeMinutes={displaySummary.overtimeMinutes}
+                        holidayItems={displaySummary.holidayPayItems}
                         hoursBasis={hoursBasis}
                         periodLabel={periodLabel}
                       />
@@ -463,6 +476,7 @@ export function PayrollPage() {
                         totalMinutes={displaySummary.totalMinutes}
                         regularMinutes={displaySummary.regularMinutes}
                         overtimeMinutes={displaySummary.overtimeMinutes}
+                        holidayItems={displaySummary.holidayPayItems}
                         hoursBasis={hoursBasis}
                         periodLabel={periodLabel}
                       />
@@ -481,11 +495,20 @@ export function PayrollPage() {
                         totalMinutes={displaySummary.totalMinutes}
                         regularMinutes={displaySummary.regularMinutes}
                         overtimeMinutes={displaySummary.overtimeMinutes}
+                        holidayItems={displaySummary.holidayPayItems}
                         hoursBasis={hoursBasis}
                         periodLabel={periodLabel}
                       />
                     ) : undefined
                   }
+                />
+                <Stat
+                  label="Holiday hours"
+                  value={displaySummary ? formatHours(displaySummary.holidayMinutes) : '—'}
+                />
+                <Stat
+                  label="Worked holiday hours"
+                  value={displaySummary ? formatHours(displaySummary.holidayWorkedMinutes) : '—'}
                 />
                 <Stat
                   label="Overnight premium"

@@ -30,6 +30,7 @@ export interface PayableShift {
   overnight_rate_cents?: number | null
   overnight_start_time?: string | null
   overnight_end_time?: string | null
+  holiday_worked?: boolean
 }
 
 export function payableShiftsInPeriod(
@@ -76,6 +77,7 @@ export function payableShiftsInPeriod(
       overnight_rate_cents: null,
       overnight_start_time: null,
       overnight_end_time: null,
+      holiday_worked: false,
     }))
 
   const fromBlocks: PayableShift[] = scheduled.map((b) => ({
@@ -91,6 +93,7 @@ export function payableShiftsInPeriod(
     overnight_rate_cents: b.overnight_rate_cents,
     overnight_start_time: b.overnight_start_time,
     overnight_end_time: b.overnight_end_time,
+    holiday_worked: b.holiday_worked,
   }))
 
   return [...fromBlocks, ...fromTemplate]

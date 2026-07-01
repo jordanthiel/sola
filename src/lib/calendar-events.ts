@@ -59,6 +59,7 @@ export interface CalendarEvent {
   attendeeLabel?: string | null
   hasLate?: boolean
   isTemplate?: boolean
+  holidayWorked?: boolean
   holidayKey?: FederalHolidayKey
 }
 
@@ -100,6 +101,7 @@ export function scheduleItemToEvent(item: ScheduleItem, nannyLabel: string): Cal
     householdNannyId: item.household_nanny_id,
     hasLate: block ? blockHasLateReport(block) : false,
     isTemplate: isTpl,
+    holidayWorked: block?.holiday_worked ?? false,
   }
 }
 
@@ -182,7 +184,7 @@ export function holidayToEvent(occurrence: FederalHolidayOccurrence): CalendarEv
     id: `holiday-${occurrence.key}-${dateKey}`,
     kind: 'holiday',
     title: occurrence.name,
-    subtitle: 'Paid holiday — nanny off',
+    subtitle: 'Paid holiday - full day hours added automatically',
     startsAt: start,
     endsAt: end,
     allDay: true,

@@ -1,5 +1,12 @@
 import { differenceInMinutes, parseISO } from 'date-fns'
-import type { EmploymentSetting, PaymentAdvance, ScheduleBlock, TimeEntry, TimeOffRequest } from '@/types/database'
+import type {
+  EmploymentSetting,
+  HouseholdHoliday,
+  PaymentAdvance,
+  ScheduleBlock,
+  TimeEntry,
+  TimeOffRequest,
+} from '@/types/database'
 import type { HoursBasis, PayrollLineItem, PayrollSnapshot } from '@/types/features'
 import { getPayReportingFromSettings, splitPayByReporting, type PayReportingSplit } from '@/lib/pay-reporting'
 import {
@@ -30,6 +37,7 @@ export function timeEntriesToPayableShifts(
         overnight_rate_cents: block?.overnight_rate_cents ?? null,
         overnight_start_time: block?.overnight_start_time ?? null,
         overnight_end_time: block?.overnight_end_time ?? null,
+        holiday_worked: true,
       }
     })
 }
@@ -62,8 +70,17 @@ export function calculateExtendedPayroll(
   advances: PaymentAdvance[],
   lineItems: PayrollLineItem[],
   vacationRequests: TimeOffRequest[] = [],
+  holidayOverrides: Pick<HouseholdHoliday, 'holiday_key' | 'enabled'>[] = [],
 ): ExtendedPayrollSummary {
-  const base = calculatePayroll(shifts, settings, periodStart, periodEnd, advances, vacationRequests)
+  const base = calculatePayroll(
+    shifts,
+    settings,
+    periodStart,
+    periodEnd,
+    advances,
+    vacationRequests,
+    holidayOverrides,
+  )
   const lineTotal = lineItemsTotalCents(lineItems)
   const reporting = splitPayByReporting(
     base.regularPayCents + base.overnightPayCents + base.vacationPayCents,
@@ -102,6 +119,10 @@ export function extendedSummaryFromSnapshot(snapshot: PayrollSnapshot): Extended
     regularMinutes: snapshot.regularMinutes,
     overtimeMinutes: snapshot.overtimeMinutes,
     overnightMinutes: snapshot.overnightMinutes ?? 0,
+    holidayMinutes: snapshot.holidayMinutes ?? 0,
+    holidayWorkedMinutes: snapshot.holidayWorkedMinutes ?? 0,
+    holidayPayCents: snapshot.holidayPayCents ?? 0,
+    holidayPayItems: [],
     regularPayCents: snapshot.regularPayCents,
     overtimePayCents: snapshot.overtimePayCents,
     overnightPayCents: snapshot.overnightPayCents ?? 0,
@@ -129,6 +150,9 @@ export function buildPayrollSnapshot(
     regularMinutes: summary.regularMinutes,
     overtimeMinutes: summary.overtimeMinutes,
     overnightMinutes: summary.overnightMinutes,
+    holidayMinutes: summary.holidayMinutes,
+    holidayWorkedMinutes: summary.holidayWorkedMinutes,
+    holidayPayCents: summary.holidayPayCents,
     regularPayCents: summary.regularPayCents,
     overtimePayCents: summary.overtimePayCents,
     overnightPayCents: summary.overnightPayCents,
@@ -166,6 +190,8 @@ export function exportPayrollCsv(
     ['Total Hours', (summary.totalMinutes / 60).toFixed(2)],
     ['Regular Hours', (summary.regularMinutes / 60).toFixed(2)],
     ['Overtime Hours', (summary.overtimeMinutes / 60).toFixed(2)],
+    ['Paid Holiday Hours', (summary.holidayMinutes / 60).toFixed(2)],
+    ['Worked Holiday Hours', (summary.holidayWorkedMinutes / 60).toFixed(2)],
     ['Overnight Hours', (summary.overnightMinutes / 60).toFixed(2)],
     ['Regular Pay', (summary.regularPayCents / 100).toFixed(2)],
     ['Overtime Pay', (summary.overtimePayCents / 100).toFixed(2)],

@@ -401,6 +401,7 @@ export interface Database {
           overnight_rate_cents: number | null
           overnight_start_time: string | null
           overnight_end_time: string | null
+          holiday_worked: boolean
           created_at: string
           updated_at: string
         }
@@ -420,6 +421,7 @@ export interface Database {
           overnight_rate_cents?: number | null
           overnight_start_time?: string | null
           overnight_end_time?: string | null
+          holiday_worked?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -439,6 +441,7 @@ export interface Database {
           overnight_rate_cents?: number | null
           overnight_start_time?: string | null
           overnight_end_time?: string | null
+          holiday_worked?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -1164,6 +1167,7 @@ export interface Database {
           p_overnight_rate_cents?: number | null
           p_overnight_start_time?: string | null
           p_overnight_end_time?: string | null
+          p_holiday_worked?: boolean
         }
         Returns: string
       }

@@ -1,5 +1,10 @@
-import { addDays, differenceInCalendarDays, max, min, parseISO, startOfDay } from 'date-fns'
-import type { EmploymentSetting, PaymentAdvance, TimeOffRequest } from '@/types/database'
+import { addDays, differenceInCalendarDays, format, max, min, parseISO, startOfDay } from 'date-fns'
+import type {
+  EmploymentSetting,
+  HouseholdHoliday,
+  PaymentAdvance,
+  TimeOffRequest,
+} from '@/types/database'
 export { getPayPeriodBounds } from '@/lib/pay-period'
 import { calculateAdvanceDeductions, totalAdvanceBalance, type AdvanceDeductionLine } from '@/lib/advances'
 import {
@@ -13,6 +18,8 @@ import {
   payableShiftOvernightMinutes,
   payableShiftOvernightPremiumCents,
 } from '@/lib/schedule-hours'
+import { federalHolidaysInRange, type FederalHolidayKey } from '@/lib/federal-holidays'
+import { enabledFederalHolidayKeys } from '@/lib/holiday-settings'
 
 export interface VacationPayItem {
   id: string
@@ -23,11 +30,25 @@ export interface VacationPayItem {
   payCents: number
 }
 
+export interface HolidayPayItem {
+  id: string
+  key: FederalHolidayKey
+  name: string
+  date: string
+  minutes: number
+  workedMinutes: number
+  payCents: number
+}
+
 export interface PayrollSummary {
   totalMinutes: number
   regularMinutes: number
   overtimeMinutes: number
   overnightMinutes: number
+  holidayMinutes: number
+  holidayWorkedMinutes: number
+  holidayPayCents: number
+  holidayPayItems: HolidayPayItem[]
   regularPayCents: number
   overtimePayCents: number
   overnightPayCents: number
@@ -49,9 +70,26 @@ export function calculatePayroll(
   _periodEnd: Date,
   advances: PaymentAdvance[],
   vacationRequests: TimeOffRequest[] = [],
+  holidayOverrides: Pick<HouseholdHoliday, 'holiday_key' | 'enabled'>[] = [],
 ): PayrollSummary {
-  const totalMinutes = shifts.reduce((sum, s) => sum + payableShiftMinutes(s), 0)
-  const overnightMinutes = shifts.reduce(
+  const holidayPayItems = holidayPayItemsInPeriod(
+    holidayOverrides,
+    settings,
+    shifts,
+    _periodStart,
+    _periodEnd,
+  )
+  const holidayDates = new Set(holidayPayItems.map((item) => item.date))
+  const workedShifts = shifts.filter((shift) => {
+    const date = shift.starts_at.split('T')[0]
+    return !holidayDates.has(date) || shift.holiday_worked
+  })
+  const workedMinutes = workedShifts.reduce((sum, s) => sum + payableShiftMinutes(s), 0)
+  const holidayMinutes = holidayPayItems.reduce((sum, item) => sum + item.minutes, 0)
+  const holidayWorkedMinutes = holidayPayItems.reduce((sum, item) => sum + item.workedMinutes, 0)
+  const holidayPayCents = holidayPayItems.reduce((sum, item) => sum + item.payCents, 0)
+  const totalMinutes = workedMinutes + holidayMinutes
+  const overnightMinutes = workedShifts.reduce(
     (sum, s) => sum + payableShiftOvernightMinutes(s, settings),
     0,
   )
@@ -72,7 +110,7 @@ export function calculatePayroll(
 
   const regularPayCents = Math.round((regularMinutes / 60) * hourly)
   const overtimePayCents = Math.round((overtimeMinutes / 60) * otRate)
-  const overnightPayCents = shifts.reduce(
+  const overnightPayCents = workedShifts.reduce(
     (sum, s) => sum + payableShiftOvernightPremiumCents(s, settings),
     0,
   )
@@ -100,6 +138,10 @@ export function calculatePayroll(
     regularMinutes,
     overtimeMinutes,
     overnightMinutes,
+    holidayMinutes,
+    holidayWorkedMinutes,
+    holidayPayCents,
+    holidayPayItems,
     regularPayCents,
     overtimePayCents,
     overnightPayCents,
@@ -113,6 +155,44 @@ export function calculatePayroll(
     netPayCents,
     reporting,
   }
+}
+
+export function holidayMinutesPerDay(settings: EmploymentSetting): number {
+  return Math.round((Number(settings.standard_hours_per_week) * 60) / 5)
+}
+
+export function holidayPayItemsInPeriod(
+  holidayOverrides: Pick<HouseholdHoliday, 'holiday_key' | 'enabled'>[],
+  settings: EmploymentSetting,
+  shifts: PayableShift[],
+  periodStart: Date,
+  periodEnd: Date,
+): HolidayPayItem[] {
+  const enabledKeys = new Set(enabledFederalHolidayKeys(holidayOverrides))
+  const minutes = holidayMinutesPerDay(settings)
+  if (minutes <= 0) return []
+
+  const workedMinutesByDate = new Map<string, number>()
+  for (const shift of shifts) {
+    if (!shift.holiday_worked) continue
+    const date = shift.starts_at.split('T')[0]
+    workedMinutesByDate.set(date, (workedMinutesByDate.get(date) ?? 0) + payableShiftMinutes(shift))
+  }
+
+  return federalHolidaysInRange(periodStart, periodEnd)
+    .filter((occ) => enabledKeys.has(occ.key))
+    .map((occ) => {
+      const date = format(occ.date, 'yyyy-MM-dd')
+      return {
+        id: `holiday-${occ.key}-${date}`,
+        key: occ.key,
+        name: occ.name,
+        date,
+        minutes,
+        workedMinutes: workedMinutesByDate.get(date) ?? 0,
+        payCents: Math.round((minutes / 60) * settings.hourly_rate_cents),
+      }
+    })
 }
 
 export function vacationPayItemsInPeriod(
@@ -159,7 +239,7 @@ export function exportShiftsCsv(
   profiles: Record<string, string>,
 ): string {
   const header =
-    'Date,Start,Scheduled End,Actual End,Break (min),Worked (min),Nanny,Overnight,Overnight Rate'
+    'Date,Start,Scheduled End,Actual End,Break (min),Worked (min),Nanny,Overnight,Overnight Rate,Holiday Worked'
   const rows = shifts.map((s) => {
     const worked = payableShiftMinutes(s)
     const date = s.starts_at.split('T')[0]
@@ -173,6 +253,7 @@ export function exportShiftsCsv(
       profiles[s.household_nanny_id] ?? s.household_nanny_id,
       s.is_overnight ? 'yes' : 'no',
       s.overnight_rate_cents ? (s.overnight_rate_cents / 100).toFixed(2) : '',
+      s.holiday_worked ? 'yes' : 'no',
     ]
       .map((v) => `"${v}"`)
       .join(',')
