@@ -121,7 +121,7 @@ export function CalendarEventForm({
   const [hours, setHours] = useState(String(event?.timeOffHours ?? 8))
 
   const [selectedChildIds, setSelectedChildIds] = useState<string[]>(
-    event?.childId ? [event.childId] : [],
+    event?.childIds?.length ? event.childIds : event?.childId ? [event.childId] : [],
   )
   const [activityType, setActivityType] = useState<ActivityType>(event?.activityType ?? 'gymnastics')
   const [title, setTitle] = useState(event?.title ?? '')
@@ -166,7 +166,9 @@ export function CalendarEventForm({
     setKind(defaultKind)
     setError('')
     const ev = state.mode !== 'create' ? state.event : null
-    setSelectedChildIds(ev?.childId ? [ev.childId] : [])
+    setSelectedChildIds(
+      ev?.childIds?.length ? ev.childIds : ev?.childId ? [ev.childId] : [],
+    )
     if (ev) {
       setPlanAttendee(
         planAttendeeFromFields({

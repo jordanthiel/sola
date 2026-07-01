@@ -32,7 +32,7 @@ export function NannySettingsSection({
           title="Pay & employment"
           description="Hourly rate, overtime rules, and pay period."
         >
-          <NannyEmploymentSettings householdNannyId={householdNannyId} />
+          <NannyEmploymentSettings nanny={nanny} />
         </SettingsSubsection>
 
         <SettingsSubsection

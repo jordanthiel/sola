@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { format } from 'date-fns'
 import { Link, useNavigate } from 'react-router-dom'
 import { ChevronRight, Eye, Plus } from 'lucide-react'
 import { toast } from 'sonner'
@@ -16,6 +17,7 @@ import {
   nannyInviteStatusVariant,
 } from '@/lib/nanny'
 import { Button } from '@/components/ui/button'
+import { DatePicker } from '@/components/ui/date-picker'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -26,11 +28,18 @@ import { HouseholdHolidaySettings } from '@/components/settings/HouseholdHoliday
 import { HouseholdMembersCard } from '@/components/settings/HouseholdMembersCard'
 import { NotificationSettingsCard } from '@/components/settings/NotificationSettingsCard'
 import { useStartNannyPreview } from '@/components/layout/NannyPreviewControls'
+import { AutoSaveStatus } from '@/components/settings/AutoSaveStatus'
+import { useDebouncedAutoSave } from '@/hooks/useDebouncedAutoSave'
+import { useFeatureAccess } from '@/hooks/useFeatureAccess'
+import { FEATURE_KEYS } from '@/lib/feature-gates'
+import { FeatureGateSettings } from '@/components/settings/FeatureGateSettings'
 
 export function SettingsPage() {
   const navigate = useNavigate()
   const { user, profile, refreshProfile } = useAuth()
   const { activeHousehold, isParent } = useHousehold()
+  const { data: canManageGates } = useFeatureAccess(FEATURE_KEYS.featureGateAdmin)
+  const { data: hasGustoAccess } = useFeatureAccess(FEATURE_KEYS.gustoPayroll)
   const startNannyPreview = useStartNannyPreview()
   const { data: nannies, refetch: refetchNannies } = useHouseholdNannies({ includeDeactivated: true })
   const qc = useQueryClient()
@@ -47,6 +56,7 @@ export function SettingsPage() {
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [notes, setNotes] = useState('')
+  const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [formError, setFormError] = useState('')
   const [showAddForm, setShowAddForm] = useState(false)
 
@@ -56,6 +66,7 @@ export function SettingsPage() {
     setEmail('')
     setPhone('')
     setNotes('')
+    setStartDate(format(new Date(), 'yyyy-MM-dd'))
     setFormError('')
   }
 
@@ -69,10 +80,23 @@ export function SettingsPage() {
     },
     onSuccess: () => {
       refreshProfile()
-      toast.success('Profile saved')
     },
     onError: (err) => toast.error(formatSupabaseError(err)),
   })
+
+  const profileDirty = useMemo(
+    () => displayName.trim() !== (profile?.display_name ?? '').trim(),
+    [displayName, profile?.display_name],
+  )
+
+  useDebouncedAutoSave(
+    () => {
+      if (!profileDirty || !displayName.trim() || saveProfile.isPending) return
+      saveProfile.mutate()
+    },
+    [profileDirty, displayName],
+    { ready: profile != null, enabled: profileDirty && !!displayName.trim() },
+  )
 
   const addNanny = useMutation({
     mutationFn: async () => {
@@ -83,6 +107,7 @@ export function SettingsPage() {
         p_email: email.trim().toLowerCase(),
         p_phone: phone.trim() || undefined,
         p_notes: notes.trim() || undefined,
+        p_start_date: startDate,
       })
       if (error) throw error
       return data as string
@@ -107,16 +132,16 @@ export function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Profile</CardTitle>
+          <div className="flex items-start justify-between gap-2">
+            <CardTitle className="text-lg">Profile</CardTitle>
+            <AutoSaveStatus isPending={saveProfile.isPending} isError={saveProfile.isError} />
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label>Display name</Label>
             <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
           </div>
-          <Button onClick={() => saveProfile.mutate()} disabled={saveProfile.isPending}>
-            Save profile
-          </Button>
         </CardContent>
       </Card>
 
@@ -237,6 +262,14 @@ export function SettingsPage() {
                         rows={2}
                       />
                     </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="nanny-start-date">Employment start date</Label>
+                      <DatePicker
+                        id="nanny-start-date"
+                        value={startDate}
+                        onChange={setStartDate}
+                      />
+                    </div>
                     {formError && <p className="text-sm text-red-600">{formError}</p>}
                     <div className="flex flex-wrap gap-2">
                       <Button
@@ -270,6 +303,38 @@ export function SettingsPage() {
           <HouseholdHolidaySettings />
 
           <HouseholdMembersCard />
+
+          {(hasGustoAccess || canManageGates) && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Integrations</CardTitle>
+                <CardDescription>Payroll and third-party services</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {hasGustoAccess && (
+                  <Link
+                    to="/settings/gusto"
+                    className="flex items-center justify-between rounded-lg border px-4 py-3 transition-colors hover:bg-[var(--color-muted)]/40"
+                  >
+                    <div>
+                      <p className="font-medium">Gusto payroll</p>
+                      <p className="text-sm text-[var(--color-muted-foreground)]">
+                        Set up compliant payroll processing
+                      </p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-[var(--color-muted-foreground)]" />
+                  </Link>
+                )}
+                {canManageGates && !hasGustoAccess && (
+                  <p className="text-sm text-[var(--color-muted-foreground)]">
+                    Grant yourself Gusto access under Feature access below to test payroll integration.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {canManageGates && <FeatureGateSettings />}
 
           <NotificationSettingsCard />
         </>

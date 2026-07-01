@@ -5,6 +5,7 @@ import {
   SHIFT_LANE_WIDTH_PCT,
   type PositionedCalendarEvent,
 } from '@/lib/calendar-grid'
+import { PlanPeopleChips } from '@/components/activities/PlanPeopleChips'
 import { cn } from '@/lib/utils'
 
 export function CalendarEventBlock({
@@ -91,6 +92,14 @@ export function CalendarEventBlock({
       <p className={cn('truncate font-semibold leading-tight', compact ? 'text-[10px]' : 'text-xs')}>
         {event.title}
       </p>
+      {event.kind === 'activity' && (event.childAttendees?.length || event.attendeeLabel) && (
+        <PlanPeopleChips
+          children={event.childAttendees}
+          attendeeLabel={event.attendeeLabel}
+          size="sm"
+          className="mt-0.5"
+        />
+      )}
       {!compact && height > 4 && (
         <p className="truncate text-[10px] opacity-90">
           {format(event.startsAt, 'h:mm')} – {format(event.endsAt, 'h:mm a')}

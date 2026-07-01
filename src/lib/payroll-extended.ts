@@ -7,7 +7,7 @@ import {
   getPayPeriodBounds,
   type PayrollSummary,
 } from '@/lib/payroll'
-import { payableShiftMinutes, payableShiftsInPeriod, type PayableShift } from '@/lib/schedule-hours'
+import { payableShiftMinutes, payableShiftsInPeriod, filterPayableShiftsByStartDate, type PayableShift } from '@/lib/schedule-hours'
 export function timeEntriesToPayableShifts(entries: TimeEntry[]): PayableShift[] {
   return entries
     .filter((e) => e.clock_out)
@@ -122,7 +122,7 @@ export function buildPayrollSnapshot(
   }
 }
 
-export { getPayPeriodBounds, payableShiftsInPeriod, payableShiftMinutes }
+export { getPayPeriodBounds, payableShiftsInPeriod, payableShiftMinutes, filterPayableShiftsByStartDate }
 
 export function exportPayrollCsvFromSnapshot(
   snapshot: PayrollSnapshot,

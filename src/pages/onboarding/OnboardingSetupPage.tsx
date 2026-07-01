@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { addDays, nextMonday, setHours, setMinutes, startOfDay } from 'date-fns'
+import { addDays, format, nextMonday, setHours, setMinutes, startOfDay } from 'date-fns'
 import {
   Baby,
   Calendar,
@@ -30,6 +30,7 @@ import {
 } from '@/types/schedule-template'
 import { OnboardingProgress } from '@/components/onboarding/OnboardingProgress'
 import { Button } from '@/components/ui/button'
+import { DatePicker } from '@/components/ui/date-picker'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { TimePicker } from '@/components/ui/time-picker'
@@ -125,6 +126,7 @@ export function OnboardingSetupPage() {
   const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
+  const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [nannyId, setNannyId] = useState<string | null>(null)
 
   const [scheduleDraft, setScheduleDraft] = useState<DayScheduleDraft[]>(() => emptyWeekDraft())
@@ -202,6 +204,7 @@ export function OnboardingSetupPage() {
         p_last_name: lastName.trim(),
         p_email: email.trim().toLowerCase(),
         p_phone: phone.trim() || undefined,
+        p_start_date: startDate,
       })
       if (rpcError) throw rpcError
       return data as string
@@ -236,12 +239,11 @@ export function OnboardingSetupPage() {
 
       const cents = Math.round(parseFloat(hourlyRate) * 100)
       if (cents > 0) {
-        const effectiveFrom = new Date().toISOString().split('T')[0]
         const { error: payError } = await supabase.from('employment_settings').insert({
           household_id: hid,
           household_nanny_id: nid,
           hourly_rate_cents: cents,
-          effective_from: effectiveFrom,
+          effective_from: startDate,
         })
         if (payError) throw payError
       }
@@ -546,6 +548,17 @@ export function OnboardingSetupPage() {
                       onChange={(e) => setPhone(e.target.value)}
                     />
                   </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="onboard-start-date">Employment start date</Label>
+                  <DatePicker
+                    id="onboard-start-date"
+                    value={startDate}
+                    onChange={setStartDate}
+                  />
+                  <p className="text-xs text-[var(--color-muted-foreground)]">
+                    Pay is counted from this date onward.
+                  </p>
                 </div>
                 {error && <p className="text-sm text-red-600">{error}</p>}
                 <div className="flex gap-2">

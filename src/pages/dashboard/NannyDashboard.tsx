@@ -15,7 +15,9 @@ import { useHousehold } from '@/contexts/HouseholdContext'
 import {
   useChildActivities,
   useEmploymentSettings,
+  useMembers,
   useMyHouseholdNanny,
+  useNannies,
   usePtoBalances,
   useScheduleBlocks,
   useScheduleTemplates,
@@ -32,6 +34,13 @@ import { mergeScheduleWithTemplates, isTemplateOccurrence } from '@/lib/schedule
 import type { NannyScheduleTemplate } from '@/types/schedule-template'
 import type { ScheduleBlock } from '@/types/database'
 import { calculatePayroll, getPayPeriodBounds } from '@/lib/payroll'
+import {
+  childAttendeesFromGroup,
+  groupChildActivities,
+  type ChildActivityWithChild,
+} from '@/lib/group-child-activities'
+import { PlanPeopleChips } from '@/components/activities/PlanPeopleChips'
+import { enrichActivitiesWithAttendeeLabels } from '@/lib/plan-attendee'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
@@ -68,6 +77,8 @@ export function NannyDashboard() {
   const { data: children } = useExtendedChildren()
   const { data: feed } = useFeedPosts()
   const { data: activities } = useChildActivities()
+  const { data: members } = useMembers()
+  const { data: nannies } = useNannies()
 
   const myPto = ptoBalances?.find((b) => b.household_nanny_id === myNanny?.id)
   const pendingOff = timeOff?.filter((t) => t.status === 'pending').length ?? 0
@@ -80,6 +91,7 @@ export function NannyDashboard() {
       myNanny.id,
       weekStart,
       weekEnd,
+      myNanny.start_date,
     )
     return shifts.reduce((s, sh) => s + payableShiftMinutes(sh), 0)
   }, [weekBlocks, templates, myNanny, weekStart, weekEnd])
@@ -92,6 +104,7 @@ export function NannyDashboard() {
       myNanny.id,
       period.start,
       period.end,
+      myNanny.start_date,
     )
     return calculatePayroll(shifts, settings, period.start, period.end, [])
   }, [settings, weekBlocks, templates, period, myNanny])
@@ -112,6 +125,16 @@ export function NannyDashboard() {
   const mentionedPosts = feed?.filter((p) =>
     p.mentions?.some((m) => m.mentioned_user_id === user?.id),
   ).slice(0, 3)
+
+  const groupedPlans = useMemo(() => {
+    const enriched = enrichActivitiesWithAttendeeLabels(activities ?? [], {
+      members,
+      nannies,
+      currentUserId: user?.id,
+      currentUserEmail: user?.email,
+    })
+    return groupChildActivities(enriched as ChildActivityWithChild[]).slice(0, 5)
+  }, [activities, members, nannies, user?.id, user?.email])
 
   return (
     <div className="space-y-6">
@@ -261,15 +284,23 @@ export function NannyDashboard() {
           </Button>
         </CardHeader>
         <CardContent>
-          {!activities?.length ? (
+          {!groupedPlans.length ? (
             <p className="text-sm text-[var(--color-muted-foreground)]">Nothing scheduled.</p>
           ) : (
             <ul className="divide-y">
-              {activities.slice(0, 5).map((a) => (
-                <li key={a.id} className="py-2 text-sm">
-                  <span className="font-medium">{a.title}</span>
-                  {' — '}
-                  {format(parseISO(a.occurred_at), 'MMM d, h:mm a')}
+              {groupedPlans.map((plan) => (
+                <li key={plan.id} className="py-2 text-sm">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">{plan.title}</span>
+                    <PlanPeopleChips
+                      children={childAttendeesFromGroup(plan)}
+                      attendeeLabel={plan.attendeeLabel}
+                      size="sm"
+                    />
+                  </div>
+                  <p className="text-[var(--color-muted-foreground)]">
+                    {format(parseISO(plan.occurred_at), 'MMM d, h:mm a')}
+                  </p>
                 </li>
               ))}
             </ul>

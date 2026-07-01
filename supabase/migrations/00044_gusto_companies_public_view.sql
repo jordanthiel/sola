@@ -29,7 +29,6 @@ GRANT SELECT (
   terms_accepted_at,
   approved_at,
   onboarding_steps,
-  payroll_admin_email,
   created_at,
   updated_at
 ) ON gusto_companies TO authenticated;

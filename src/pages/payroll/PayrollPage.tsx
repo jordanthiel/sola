@@ -46,6 +46,7 @@ import {
   getPayPeriodBounds,
   payableShiftsInPeriod,
   timeEntriesToPayableShifts,
+  filterPayableShiftsByStartDate,
 } from '@/lib/payroll-extended'
 import { downloadPayStubPdf } from '@/lib/pay-stub-pdf'
 import {
@@ -65,6 +66,8 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
+import { GustoPayrollActions } from '@/components/payroll/GustoPayrollActions'
+import { GustoNannyPayrollSetup } from '@/components/payroll/GustoNannyPayrollSetup'
 
 export function PayrollPage() {
   const { user } = useAuth()
@@ -115,6 +118,8 @@ export function PayrollPage() {
     return { payReportingMode: mode, payReportingLabel: label }
   }, [settings])
 
+  const payStartDate = selectedNannyProfile?.start_date
+
   const payableShifts = useMemo(() => {
     if (!period || !householdNannyId) return []
 
@@ -126,15 +131,16 @@ export function PayrollPage() {
             householdNannyId,
             period.start,
             period.end,
+            payStartDate,
           )
         : []
 
     const actualShifts = timeEntries?.length
-      ? timeEntriesToPayableShifts(timeEntries)
+      ? filterPayableShiftsByStartDate(timeEntriesToPayableShifts(timeEntries), payStartDate)
       : scheduledShifts
 
     return hoursBasis === 'actual' ? actualShifts : scheduledShifts
-  }, [blocks, templates, period, householdNannyId, hoursBasis, timeEntries])
+  }, [blocks, templates, period, householdNannyId, hoursBasis, timeEntries, payStartDate])
 
   const summary = useMemo(() => {
     if (!settings || !period || !householdNannyId) return null
@@ -290,6 +296,7 @@ export function PayrollPage() {
       householdNannyId,
       period.start,
       period.end,
+      payStartDate,
     )
     const names: Record<string, string> = {
       [householdNannyId]: selectedNannyProfile ? nannyDisplayName(selectedNannyProfile) : 'Nanny',
@@ -354,6 +361,8 @@ export function PayrollPage() {
           stub PDF.
         </p>
       )}
+
+      {isNanny && !isDeactivated && <GustoNannyPayrollSetup />}
 
       <Card>
         <CardContent className="flex flex-wrap gap-4 pt-6">
@@ -636,6 +645,14 @@ export function PayrollPage() {
             />
           )}
 
+          {isParent && householdNannyId && period && (
+            <GustoPayrollActions
+              householdNannyId={householdNannyId}
+              payPeriodCloseId={periodClose?.id}
+              periodLabel={`${format(period.start, 'MMM d')} – ${format(period.end, 'MMM d, yyyy')}`}
+            />
+          )}
+
           <PayPeriodHistoryCard rows={payPeriodHistory} />
         </>
       )}
@@ -643,6 +660,7 @@ export function PayrollPage() {
       {isParent && (
         <PaymentAdvancesCard
           householdNannyId={householdNannyId}
+          payStartDate={payStartDate}
           templates={templates as NannyScheduleTemplate[] | undefined}
         />
       )}

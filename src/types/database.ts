@@ -131,6 +131,7 @@ export interface Database {
           claimed_at: string | null
           deactivated_at: string | null
           deactivated_by: string | null
+          start_date: string
           created_at: string
           updated_at: string
         }
@@ -150,6 +151,7 @@ export interface Database {
           claimed_at?: string | null
           deactivated_at?: string | null
           deactivated_by?: string | null
+          start_date?: string
           created_at?: string
           updated_at?: string
         }
@@ -169,6 +171,7 @@ export interface Database {
           claimed_at?: string | null
           deactivated_at?: string | null
           deactivated_by?: string | null
+          start_date?: string
           created_at?: string
           updated_at?: string
         }
@@ -1030,6 +1033,29 @@ export interface Database {
         Update: never
         Relationships: []
       }
+      payroll_runs: {
+        Row: {
+          id: string
+          household_id: string
+          household_nanny_id: string
+          pay_period_close_id: string
+          gusto_payroll_uuid: string | null
+          status: string
+          company_debit_cents: number | null
+          net_pay_cents: number | null
+          tax_debit_cents: number | null
+          preview_payload: Json | null
+          error_message: string | null
+          submitted_at: string | null
+          paid_at: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: {
@@ -1061,6 +1087,7 @@ export interface Database {
           p_email: string
           p_phone?: string
           p_notes?: string
+          p_start_date?: string
         }
         Returns: string
       }
@@ -1173,6 +1200,44 @@ export interface Database {
       generate_recurring_child_plans: {
         Args: { p_household_id: string; p_through_date?: string }
         Returns: number
+      }
+      user_has_feature: {
+        Args: { p_feature_key: string }
+        Returns: boolean
+      }
+      list_feature_gates_admin: {
+        Args: Record<string, never>
+        Returns: {
+          feature_key: string
+          label: string
+          description: string | null
+          open_to_all: boolean
+          allowlist_user_ids: string[]
+        }[]
+      }
+      update_feature_gate: {
+        Args: {
+          p_feature_key: string
+          p_open_to_all: boolean
+          p_user_ids?: string[]
+        }
+        Returns: undefined
+      }
+      search_users_for_feature_gate: {
+        Args: { p_query: string; p_limit?: number }
+        Returns: {
+          user_id: string
+          email: string
+          display_name: string
+        }[]
+      }
+      get_feature_gate_users: {
+        Args: { p_user_ids: string[] }
+        Returns: {
+          user_id: string
+          email: string
+          display_name: string
+        }[]
       }
     }
     Enums: Record<string, never>

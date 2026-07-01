@@ -1,19 +1,26 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { format } from 'date-fns'
+import { toast } from 'sonner'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useHousehold } from '@/contexts/HouseholdContext'
 import { useEmploymentSettings } from '@/hooks/useHouseholdData'
-import { Button } from '@/components/ui/button'
+import { useDebouncedAutoSave } from '@/hooks/useDebouncedAutoSave'
+import { formatSupabaseError } from '@/lib/errors'
+import { AutoSaveStatus } from '@/components/settings/AutoSaveStatus'
+import { DatePicker } from '@/components/ui/date-picker'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { selectCn } from '@/lib/utils'
 import { payReportingModeLabel } from '@/lib/pay-reporting'
 import type { PayPeriodType, PayReportingMode } from '@/types/database'
+import type { HouseholdNanny } from '@/types/household-nanny'
 
-export function NannyEmploymentSettings({ householdNannyId }: { householdNannyId: string }) {
+export function NannyEmploymentSettings({ nanny }: { nanny: HouseholdNanny }) {
+  const householdNannyId = nanny.id
   const { activeHousehold } = useHousehold()
   const qc = useQueryClient()
-  const { data: employment } = useEmploymentSettings(householdNannyId)
+  const { data: employment, isLoading } = useEmploymentSettings(householdNannyId)
 
   const [hourlyRate, setHourlyRate] = useState('')
   const [otMultiplier, setOtMultiplier] = useState('1.5')
@@ -24,8 +31,13 @@ export function NannyEmploymentSettings({ householdNannyId }: { householdNannyId
   const [payReportingMode, setPayReportingMode] = useState<PayReportingMode>('all_over')
   const [overTablePercent, setOverTablePercent] = useState('100')
   const [autoRecordAdvanceRepayments, setAutoRecordAdvanceRepayments] = useState(false)
+  const [startDate, setStartDate] = useState(nanny.start_date)
 
   const current = employment?.[0]
+
+  useEffect(() => {
+    setStartDate(nanny.start_date)
+  }, [nanny.start_date, householdNannyId])
 
   useEffect(() => {
     if (!current) return
@@ -52,9 +64,60 @@ export function NannyEmploymentSettings({ householdNannyId }: { householdNannyId
     householdNannyId,
   ])
 
+  const hasChanges = useMemo(() => {
+    if (startDate !== nanny.start_date) return true
+    if (!hourlyRate.trim()) return false
+
+    const cents = Math.round(parseFloat(hourlyRate) * 100)
+    if (Number.isNaN(cents)) return false
+
+    if (!current) return true
+
+    const pct = Math.min(100, Math.max(0, parseFloat(overTablePercent) || 0))
+    const overTable =
+      payReportingMode === 'split' ? pct : payReportingMode === 'all_under' ? 0 : 100
+
+    return (
+      cents !== current.hourly_rate_cents ||
+      parseFloat(otMultiplier) !== Number(current.overtime_multiplier) ||
+      parseFloat(standardHours) !== Number(current.standard_hours_per_week) ||
+      payPeriod !== current.pay_period ||
+      employmentType !== (current.employment_type ?? 'household') ||
+      (taxNotes || null) !== (current.tax_withholding_notes ?? null) ||
+      payReportingMode !== (current.pay_reporting_mode ?? 'all_over') ||
+      overTable !== (current.over_table_percent ?? 100) ||
+      autoRecordAdvanceRepayments !== (current.auto_record_advance_repayments ?? false)
+    )
+  }, [
+    autoRecordAdvanceRepayments,
+    current,
+    employmentType,
+    hourlyRate,
+    nanny.start_date,
+    otMultiplier,
+    overTablePercent,
+    payPeriod,
+    payReportingMode,
+    standardHours,
+    startDate,
+    taxNotes,
+  ])
+
   const saveEmployment = useMutation({
     mutationFn: async () => {
+      if (startDate !== nanny.start_date) {
+        const { error: startDateError } = await supabase
+          .from('household_nannies')
+          .update({ start_date: startDate })
+          .eq('id', householdNannyId)
+        if (startDateError) throw startDateError
+      }
+
+      if (!hourlyRate.trim()) return
+
       const cents = Math.round(parseFloat(hourlyRate) * 100)
+      if (Number.isNaN(cents)) return
+
       const pct = Math.min(100, Math.max(0, parseFloat(overTablePercent) || 0))
       const effectiveFrom = new Date().toISOString().split('T')[0]
       const payload = {
@@ -81,21 +144,32 @@ export function NannyEmploymentSettings({ householdNannyId }: { householdNannyId
           .update(payload)
           .eq('id', existingToday.id)
         if (error) throw error
-        return
+      } else {
+        const { error } = await supabase.from('employment_settings').insert({
+          household_id: activeHousehold!.id,
+          household_nanny_id: householdNannyId,
+          effective_from: effectiveFrom,
+          ...payload,
+        })
+        if (error) throw error
       }
-
-      const { error } = await supabase.from('employment_settings').insert({
-        household_id: activeHousehold!.id,
-        household_nanny_id: householdNannyId,
-        effective_from: effectiveFrom,
-        ...payload,
-      })
-      if (error) throw error
     },
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ['employment'] })
+      await qc.invalidateQueries({ queryKey: ['household_nannies'] })
+      await qc.invalidateQueries({ queryKey: ['nannies'] })
     },
+    onError: (err) => toast.error(formatSupabaseError(err)),
   })
+
+  useDebouncedAutoSave(
+    () => {
+      if (!hasChanges || saveEmployment.isPending) return
+      saveEmployment.mutate()
+    },
+    [hasChanges],
+    { ready: !isLoading, enabled: hasChanges },
+  )
 
   const reportingSummary = current
     ? current.pay_reporting_mode === 'split'
@@ -105,6 +179,10 @@ export function NannyEmploymentSettings({ householdNannyId }: { householdNannyId
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-end">
+        <AutoSaveStatus isPending={saveEmployment.isPending} isError={saveEmployment.isError} />
+      </div>
+
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="hourly-rate">Hourly rate ($)</Label>
@@ -144,6 +222,13 @@ export function NannyEmploymentSettings({ householdNannyId }: { householdNannyId
             <option value="biweekly">Biweekly</option>
             <option value="monthly">Monthly</option>
           </select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="start-date">Employment start date</Label>
+          <DatePicker id="start-date" value={startDate} onChange={setStartDate} />
+          <p className="text-xs text-[var(--color-muted-foreground)]">
+            Scheduled hours before this date are not counted toward pay.
+          </p>
         </div>
         <div className="space-y-2">
           <Label htmlFor="employment-type">Employment type</Label>
@@ -241,16 +326,10 @@ export function NannyEmploymentSettings({ householdNannyId }: { householdNannyId
         <p className="text-sm text-[var(--color-muted-foreground)]">
           Current: ${(current.hourly_rate_cents / 100).toFixed(2)}/hr ·{' '}
           {current.standard_hours_per_week}h standard · {current.pay_period} pay ·{' '}
-          {current.overtime_multiplier}× OT
+          {current.overtime_multiplier}× OT · starts {format(new Date(`${startDate}T12:00:00`), 'MMM d, yyyy')}
           {reportingSummary && <> · {reportingSummary}</>}
         </p>
       )}
-      <Button
-        onClick={() => saveEmployment.mutate()}
-        disabled={!hourlyRate || saveEmployment.isPending}
-      >
-        {saveEmployment.isPending ? 'Saving...' : 'Save pay settings'}
-      </Button>
     </div>
   )
 }

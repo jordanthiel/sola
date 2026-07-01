@@ -38,10 +38,15 @@ import { Badge } from '@/components/ui/badge'
 
 interface PaymentAdvancesCardProps {
   householdNannyId: string | undefined
+  payStartDate?: string | null
   templates: NannyScheduleTemplate[] | undefined
 }
 
-export function PaymentAdvancesCard({ householdNannyId, templates }: PaymentAdvancesCardProps) {
+export function PaymentAdvancesCard({
+  householdNannyId,
+  payStartDate,
+  templates,
+}: PaymentAdvancesCardProps) {
   const { activeHousehold } = useHousehold()
   const qc = useQueryClient()
   const { data: advances } = usePaymentAdvances(householdNannyId)
@@ -79,8 +84,9 @@ export function PaymentAdvancesCard({ householdNannyId, templates }: PaymentAdva
       blocks: backfillBlocks ?? [],
       templates: scheduleTemplates,
       householdNannyId,
+      payStartDate,
     }
-  }, [backfillBlocks, scheduleTemplates, householdNannyId])
+  }, [backfillBlocks, scheduleTemplates, householdNannyId, payStartDate])
 
   const amountCents = Math.round(parseFloat(advanceAmount || '0') * 100)
   const perPaycheckCents =

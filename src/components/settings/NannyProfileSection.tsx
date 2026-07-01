@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useHousehold } from '@/contexts/HouseholdContext'
 import { useHouseholdNannies } from '@/hooks/useHouseholdData'
+import { useDebouncedAutoSave } from '@/hooks/useDebouncedAutoSave'
 import { formatSupabaseError } from '@/lib/errors'
+import { AutoSaveStatus } from '@/components/settings/AutoSaveStatus'
 import {
   getNannyInviteStatus,
   isNannyActive,
@@ -74,6 +76,11 @@ export function NannyProfileSection({ nanny }: { nanny: HouseholdNanny }) {
   const profileInvalid =
     !firstName.trim() || !lastName.trim() || !normalizedEmail || !normalizedEmail.includes('@')
 
+  const canAutoSave = useMemo(
+    () => editing && profileDirty && !profileInvalid,
+    [editing, profileDirty, profileInvalid],
+  )
+
   const saveProfile = useMutation({
     mutationFn: async () => {
       if (emailChanged) {
@@ -96,13 +103,20 @@ export function NannyProfileSection({ nanny }: { nanny: HouseholdNanny }) {
       if (error) throw error
     },
     onSuccess: async () => {
-      setEditing(false)
       await refetchNannies()
       void qc.invalidateQueries({ queryKey: ['household_nannies'] })
-      toast.success('Profile updated')
     },
     onError: (err) => toast.error(formatSupabaseError(err)),
   })
+
+  useDebouncedAutoSave(
+    () => {
+      if (!canAutoSave || saveProfile.isPending) return
+      saveProfile.mutate()
+    },
+    [canAutoSave, firstName, lastName, email, phone, notes],
+    { ready: editing, enabled: canAutoSave },
+  )
 
   const sendNannyInvite = useMutation({
     mutationFn: async () => {
@@ -217,15 +231,10 @@ export function NannyProfileSection({ nanny }: { nanny: HouseholdNanny }) {
                 rows={2}
               />
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                onClick={() => saveProfile.mutate()}
-                disabled={!profileDirty || profileInvalid || saveProfile.isPending}
-              >
-                {saveProfile.isPending ? 'Saving...' : 'Save changes'}
-              </Button>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <AutoSaveStatus isPending={saveProfile.isPending} isError={saveProfile.isError} />
               <Button variant="outline" onClick={cancelEdit} disabled={saveProfile.isPending}>
-                Cancel
+                Done
               </Button>
             </div>
           </div>

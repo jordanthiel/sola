@@ -23,4 +23,6 @@ SELECT
   updated_at
 FROM gusto_companies;
 
+GRANT SELECT (payroll_admin_email) ON gusto_companies TO authenticated;
+
 GRANT SELECT ON gusto_companies_public TO authenticated;

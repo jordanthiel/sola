@@ -48,6 +48,55 @@ export async function requireParentForHousehold(
   return { userId: user.id }
 }
 
+export async function requireNannyForHousehold(
+  authHeader: string,
+  householdId: string,
+  householdNannyId?: string,
+): Promise<{ userId: string; householdNannyId: string }> {
+  const supabase = getUserSupabase(authHeader)
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser()
+  if (error || !user) throw new Error('Unauthorized')
+
+  const { data: member, error: memberError } = await supabase
+    .from('household_members')
+    .select('role')
+    .eq('household_id', householdId)
+    .eq('user_id', user.id)
+    .eq('status', 'active')
+    .maybeSingle()
+
+  if (memberError || !member || member.role !== 'nanny') {
+    throw new Error('Forbidden: nanny access required')
+  }
+
+  const admin = getServiceSupabase()
+  const { data: nanny, error: nannyError } = await admin
+    .from('household_nannies')
+    .select('id, user_id, deactivated_at')
+    .eq('household_id', householdId)
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (nannyError || !nanny || nanny.deactivated_at) {
+    throw new Error('Forbidden: nanny profile not found for this household')
+  }
+
+  if (householdNannyId && nanny.id !== householdNannyId) {
+    throw new Error('Forbidden: nanny profile mismatch')
+  }
+
+  return { userId: user.id, householdNannyId: nanny.id }
+}
+
+export async function requireGustoConfigured(householdId: string) {
+  const row = await getCompanyTokens(householdId)
+  if (!row) throw new Error('Gusto payroll not set up for this household')
+  return row
+}
+
 export async function getCompanyTokens(householdId: string) {
   const admin = getServiceSupabase()
   const { data, error } = await admin

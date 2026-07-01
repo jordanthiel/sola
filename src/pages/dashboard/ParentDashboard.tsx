@@ -5,6 +5,7 @@ import { Calendar, ChevronRight, Clock } from 'lucide-react'
 import { useHousehold } from '@/contexts/HouseholdContext'
 import {
   useChildActivities,
+  useMembers,
   useNannies,
   usePendingTimeOff,
   useScheduleBlocks,
@@ -21,12 +22,20 @@ import type { TemplateOccurrence } from '@/lib/schedule'
 import type { NannyScheduleTemplate } from '@/types/schedule-template'
 import type { ScheduleBlock } from '@/types/database'
 import { PageHeader } from '@/components/layout/PageHeader'
+import { useAuth } from '@/contexts/AuthContext'
 import { GettingStartedCard } from '@/components/dashboard/GettingStartedCard'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { formatHours } from '@/lib/utils'
+import {
+  childAttendeesFromGroup,
+  groupChildActivities,
+  type ChildActivityWithChild,
+} from '@/lib/group-child-activities'
+import { PlanPeopleChips } from '@/components/activities/PlanPeopleChips'
+import { enrichActivitiesWithAttendeeLabels } from '@/lib/plan-attendee'
 
 function shiftStartAt(item: ScheduleBlock | TemplateOccurrence): Date {
   return typeof item.starts_at === 'string' ? parseISO(item.starts_at) : item.starts_at
@@ -42,6 +51,7 @@ function shiftEndAt(item: ScheduleBlock | TemplateOccurrence): Date {
 
 export function ParentDashboard() {
   const { activeHousehold } = useHousehold()
+  const { user } = useAuth()
   const todayKey = format(new Date(), 'yyyy-MM-dd')
   const today = useMemo(() => startOfDay(new Date()), [todayKey])
   const weekStart = useMemo(() => startOfWeek(today, { weekStartsOn: 1 }), [today])
@@ -53,6 +63,7 @@ export function ParentDashboard() {
   const scheduleTo = upcomingEnd.toISOString()
 
   const { data: nannies } = useNannies()
+  const { data: members } = useMembers()
   const nannyIds = useMemo(() => nannies?.map((n) => n.id) ?? [], [nannies])
 
   const { data: upcomingBlocks } = useScheduleBlocks(scheduleFrom, scheduleTo)
@@ -65,10 +76,18 @@ export function ParentDashboard() {
     if (!weekBlocks || !nannyIds.length) return 0
     const tpl = (templates ?? []) as NannyScheduleTemplate[]
     return nannyIds.reduce((total, nannyId) => {
-      const shifts = payableShiftsInPeriod(weekBlocks, tpl, nannyId, weekStart, weekEnd)
+      const nanny = nannies?.find((n) => n.id === nannyId)
+      const shifts = payableShiftsInPeriod(
+        weekBlocks,
+        tpl,
+        nannyId,
+        weekStart,
+        weekEnd,
+        nanny?.start_date,
+      )
       return total + shifts.reduce((s, sh) => s + payableShiftMinutes(sh), 0)
     }, 0)
-  }, [weekBlocks, templates, nannyIds, weekStart, weekEnd])
+  }, [weekBlocks, templates, nannyIds, weekStart, weekEnd, nannies])
 
   const mergedUpcoming = useMemo(() => {
     if (!upcomingBlocks || !nannyIds.length) return []
@@ -90,6 +109,16 @@ export function ParentDashboard() {
     () => Object.fromEntries((nannies ?? []).map((n) => [n.id, nannyDisplayName(n)])),
     [nannies],
   )
+
+  const groupedPlans = useMemo(() => {
+    const enriched = enrichActivitiesWithAttendeeLabels(activities ?? [], {
+      members,
+      nannies,
+      currentUserId: user?.id,
+      currentUserEmail: user?.email,
+    })
+    return groupChildActivities(enriched as ChildActivityWithChild[]).slice(0, 5)
+  }, [activities, members, nannies, user?.id, user?.email])
 
   return (
     <div className="space-y-6">
@@ -191,7 +220,7 @@ export function ParentDashboard() {
           </Button>
         </CardHeader>
         <CardContent>
-          {!activities?.length ? (
+          {!groupedPlans.length ? (
             <div className="py-4 text-center">
               <p className="text-sm text-[var(--color-muted-foreground)]">Nothing scheduled yet.</p>
               <Button variant="outline" size="sm" className="mt-3" asChild>
@@ -200,18 +229,20 @@ export function ParentDashboard() {
             </div>
           ) : (
             <ul className="divide-y">
-              {activities.slice(0, 5).map((a) => (
-                <li key={a.id} className="py-3 first:pt-0 last:pb-0">
+              {groupedPlans.map((plan) => (
+                <li key={plan.id} className="py-3 first:pt-0 last:pb-0">
                   <div className="flex items-start justify-between gap-2">
-                    <p className="font-medium">{a.title}</p>
-                    {a.children?.name && (
-                      <span className="shrink-0 text-sm text-[var(--color-muted-foreground)]">
-                        {a.children.name}
-                      </span>
-                    )}
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                      <p className="font-medium">{plan.title}</p>
+                      <PlanPeopleChips
+                        children={childAttendeesFromGroup(plan)}
+                        attendeeLabel={plan.attendeeLabel}
+                        size="sm"
+                      />
+                    </div>
                   </div>
                   <p className="text-sm text-[var(--color-muted-foreground)]">
-                    {format(parseISO(a.occurred_at), 'MMM d, h:mm a')}
+                    {format(parseISO(plan.occurred_at), 'MMM d, h:mm a')}
                   </p>
                 </li>
               ))}
