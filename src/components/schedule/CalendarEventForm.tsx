@@ -152,7 +152,7 @@ export function CalendarEventForm({
   )
 
   const [selectedChildIds, setSelectedChildIds] = useState<string[]>(
-    event?.childId ? [event.childId] : [],
+    event?.childIds?.length ? event.childIds : event?.childId ? [event.childId] : [],
   )
   const [activityType, setActivityType] = useState<ActivityType>(event?.activityType ?? 'gymnastics')
   const [title, setTitle] = useState(event?.title ?? '')
@@ -213,7 +213,9 @@ export function CalendarEventForm({
     setVacationDailyRate(
       ev?.timeOffVacationRateCents == null ? '' : (ev.timeOffVacationRateCents / 100).toFixed(2),
     )
-    setSelectedChildIds(ev?.childId ? [ev.childId] : [])
+    setSelectedChildIds(
+      ev?.childIds?.length ? ev.childIds : ev?.childId ? [ev.childId] : [],
+    )
     if (ev) {
       setPlanAttendee(
         planAttendeeFromFields({

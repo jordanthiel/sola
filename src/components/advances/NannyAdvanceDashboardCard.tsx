@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { ChevronRight, HandCoins } from 'lucide-react'
 import {
   useEmploymentSettings,
+  useMyHouseholdNanny,
   usePaymentAdvances,
   useScheduleTemplates,
 } from '@/hooks/useHouseholdData'
@@ -27,6 +28,7 @@ interface NannyAdvanceDashboardCardProps {
 }
 
 export function NannyAdvanceDashboardCard({ householdNannyId }: NannyAdvanceDashboardCardProps) {
+  const { data: myNanny } = useMyHouseholdNanny()
   const { data: advances } = usePaymentAdvances(householdNannyId)
   const { data: settingsList } = useEmploymentSettings(householdNannyId)
   const { data: templates } = useScheduleTemplates(householdNannyId)
@@ -38,8 +40,9 @@ export function NannyAdvanceDashboardCard({ householdNannyId }: NannyAdvanceDash
       blocks: [],
       templates: (templates ?? []) as NannyScheduleTemplate[],
       householdNannyId,
+      payStartDate: myNanny?.start_date,
     }
-  }, [householdNannyId, templates])
+  }, [householdNannyId, templates, myNanny?.start_date])
 
   const outstanding = useMemo(() => openAdvances(advances ?? []), [advances])
   const totalBalance = useMemo(() => totalAdvanceBalance(outstanding), [outstanding])

@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react'
 import type { CalendarEvent } from '@/lib/calendar-events'
 import { eachDayInRange, eventsOnDay } from '@/lib/calendar-events'
 import { eventColors, eventTimeLabel } from '@/lib/calendar-grid'
+import { PlanPeopleChips } from '@/components/activities/PlanPeopleChips'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -57,7 +58,16 @@ function ScheduleDayGroup({
                           colors.border,
                         )}
                       >
-                        <span className={cn('font-medium', colors.text)}>{event.title}</span>
+                        <span className={cn('flex flex-wrap items-center gap-2 font-medium', colors.text)}>
+                          <span>{event.title}</span>
+                          {event.kind === 'activity' && (
+                            <PlanPeopleChips
+                              children={event.childAttendees}
+                              attendeeLabel={event.attendeeLabel}
+                              size="sm"
+                            />
+                          )}
+                        </span>
                         <span className="text-sm text-[var(--color-muted-foreground)]">
                           {eventTimeLabel(event)}
                         </span>

@@ -33,12 +33,29 @@ export interface PayableShift {
   holiday_worked?: boolean
 }
 
+export function isShiftOnOrAfterPayStart(
+  shiftStartsAt: string,
+  payStartDate?: string | null,
+): boolean {
+  if (!payStartDate) return true
+  return format(parseISO(shiftStartsAt), 'yyyy-MM-dd') >= payStartDate
+}
+
+export function filterPayableShiftsByStartDate(
+  shifts: PayableShift[],
+  payStartDate?: string | null,
+): PayableShift[] {
+  if (!payStartDate) return shifts
+  return shifts.filter((s) => isShiftOnOrAfterPayStart(s.starts_at, payStartDate))
+}
+
 export function payableShiftsInPeriod(
   blocks: ScheduleBlock[],
   templates: NannyScheduleTemplate[],
   householdNannyId: string,
   periodStart: Date,
   periodEnd: Date,
+  payStartDate?: string | null,
 ): PayableShift[] {
   const scheduled = blocks.filter(
     (b) =>
@@ -96,7 +113,7 @@ export function payableShiftsInPeriod(
     holiday_worked: b.holiday_worked,
   }))
 
-  return [...fromBlocks, ...fromTemplate]
+  return filterPayableShiftsByStartDate([...fromBlocks, ...fromTemplate], payStartDate)
 }
 
 export function payableShiftMinutes(shift: PayableShift): number {

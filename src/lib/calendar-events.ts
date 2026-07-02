@@ -10,13 +10,14 @@ import {
 import { isTemplateOccurrence, type TemplateOccurrence } from '@/lib/schedule'
 import { blockHasLateReport, effectiveEndIso } from '@/lib/schedule-hours'
 import { activityTypeLabel } from '@/lib/child-plans'
+import { formatChildNames, groupChildActivities, childAttendeesFromGroup, type ChildActivityWithChild, type GroupedChildActivity } from '@/lib/group-child-activities'
 import {
   federalHolidaysInRange,
   type FederalHolidayKey,
   type FederalHolidayOccurrence,
 } from '@/lib/federal-holidays'
 import { enabledFederalHolidayKeys } from '@/lib/holiday-settings'
-import { isChildColorKey, type ChildColorKey } from '@/lib/child-colors'
+import { type ChildColorKey } from '@/lib/child-colors'
 import type {
   ActivityType,
   ChildActivity,
@@ -50,8 +51,12 @@ export interface CalendarEvent {
   timeOffReviewNotes?: string | null
   activityType?: ActivityType
   childId?: string
+  childIds?: string[]
   childName?: string | null
+  childAttendees?: { id: string; name: string; colorKey?: ChildColorKey }[]
   childColorKey?: ChildColorKey
+  planGroupId?: string | null
+  sourceIds?: string[]
   description?: string | null
   mood?: ChildActivity['mood']
   attendeeUserId?: string | null
@@ -133,46 +138,56 @@ export function timeOffToEvent(req: TimeOffRequest, nannyLabel: string): Calenda
   }
 }
 
+export function groupedActivityToEvent(group: GroupedChildActivity): CalendarEvent {
+  const start = parseISO(group.occurred_at)
+  const end = group.duration_minutes
+    ? addMinutes(start, group.duration_minutes)
+    : addMinutes(start, 30)
+
+  const childAttendees = childAttendeesFromGroup(group)
+  const childLabel = formatChildNames(group.childNames)
+  const typeLabel = activityTypeLabel(group.activity_type)
+  const subtitle = childLabel ? `${childLabel} · ${typeLabel}` : typeLabel
+
+  return {
+    id: `activity-${group.id}`,
+    kind: 'activity',
+    title: group.title,
+    subtitle,
+    startsAt: start,
+    endsAt: end,
+    allDay: false,
+    sourceId: group.sourceIds[0],
+    sourceIds: group.sourceIds,
+    activityType: group.activity_type,
+    childId: group.childIds[0],
+    childIds: group.childIds,
+    childName: childLabel || null,
+    childAttendees,
+    childColorKey: group.childColorKeys[0],
+    planGroupId: group.planGroupId,
+    description: group.description,
+    mood: group.mood,
+    attendeeUserId: group.attendee_user_id,
+    attendeeHouseholdNannyId: group.attendee_household_nanny_id,
+    attendeeLabel: group.attendeeLabel ?? null,
+  }
+}
+
 export function activityToEvent(
   activity: ChildActivity & {
     children?: { name: string; color_key: string } | null
     attendeeLabel?: string | null
   },
 ): CalendarEvent {
-  const start = parseISO(activity.occurred_at)
-  const end = activity.duration_minutes
-    ? addMinutes(start, activity.duration_minutes)
-    : addMinutes(start, 30)
-
-  const childName = activity.children?.name ?? null
-
-  const typeLabel = activityTypeLabel(activity.activity_type)
-  const attendeePart = activity.attendeeLabel ? ` · ${activity.attendeeLabel} going` : ''
-  const subtitle = childName
-    ? `${childName} · ${typeLabel}${attendeePart}`
-    : `${typeLabel}${attendeePart}`
-
-  return {
-    id: `activity-${activity.id}`,
-    kind: 'activity',
-    title: activity.title,
-    subtitle,
-    startsAt: start,
-    endsAt: end,
-    allDay: false,
-    sourceId: activity.id,
-    activityType: activity.activity_type,
-    childId: activity.child_id,
-    childName,
-    childColorKey: isChildColorKey(activity.children?.color_key)
-      ? activity.children.color_key
-      : undefined,
-    description: activity.description,
-    mood: activity.mood,
-    attendeeUserId: activity.attendee_user_id,
-    attendeeHouseholdNannyId: activity.attendee_household_nanny_id,
-    attendeeLabel: activity.attendeeLabel ?? null,
-  }
+  return groupedActivityToEvent(
+    groupChildActivities([
+      {
+        ...activity,
+        children: activity.children ?? null,
+      },
+    ] as ChildActivityWithChild[])[0],
+  )
 }
 
 export function holidayToEvent(occurrence: FederalHolidayOccurrence): CalendarEvent {
@@ -233,8 +248,8 @@ export function buildCalendarEvents(input: {
     events.push(timeOffToEvent(req, nannyName(req.household_nanny_id)))
   }
 
-  for (const activity of activities) {
-    events.push(activityToEvent(activity))
+  for (const group of groupChildActivities(activities as ChildActivityWithChild[])) {
+    events.push(groupedActivityToEvent(group))
   }
 
   if (holidayRange) {

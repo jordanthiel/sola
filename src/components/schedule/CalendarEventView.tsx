@@ -5,6 +5,7 @@ import { eventColors, eventTimeLabel } from '@/lib/calendar-grid'
 import { formatSupabaseError } from '@/lib/errors'
 import type { useCalendarMutations } from '@/hooks/useCalendarMutations'
 import { TimeOffReviewActions } from '@/components/time-off/TimeOffReviewActions'
+import { PlanPeopleChips } from '@/components/activities/PlanPeopleChips'
 import { TimeOffReviewNotesDisplay } from '@/components/time-off/time-off-notes'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -65,9 +66,13 @@ export function CalendarEventView({
       } else if (event.kind === 'time_off' && event.sourceId) {
         if (!confirm('Delete this time off request?')) return
         await mutations.deleteTimeOff.mutateAsync(event.sourceId)
-      } else if (event.kind === 'activity' && event.sourceId) {
-        if (!confirm('Delete this activity?')) return
-        await mutations.deleteActivity.mutateAsync(event.sourceId)
+      } else if (event.kind === 'activity') {
+        const ids = event.sourceIds?.length ? event.sourceIds : event.sourceId ? [event.sourceId] : []
+        if (!ids.length) return
+        if (!confirm(ids.length > 1 ? 'Delete this plan for all children?' : 'Delete this activity?')) return
+        for (const id of ids) {
+          await mutations.deleteActivity.mutateAsync(id)
+        }
       }
       onClose()
     } catch (e) {
@@ -80,6 +85,13 @@ export function CalendarEventView({
       <article className={cn('rounded-md border-l-4 px-3 py-2', colors.bg, colors.border)}>
         <p className="text-xs font-medium uppercase tracking-wide opacity-70">{KIND_LABELS[event.kind]}</p>
         <p className="font-semibold">{event.title}</p>
+        {event.kind === 'activity' && (
+          <PlanPeopleChips
+            children={event.childAttendees}
+            attendeeLabel={event.attendeeLabel}
+            className="mt-1"
+          />
+        )}
         {event.subtitle && <p className="text-sm opacity-80">{event.subtitle}</p>}
         <p className="mt-1 text-sm">{eventTimeLabel(event)}</p>
         {event.description && (

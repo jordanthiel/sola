@@ -38,8 +38,9 @@ export function AdvanceDetailPage() {
       blocks: [],
       templates: (templates ?? []) as NannyScheduleTemplate[],
       householdNannyId: myNanny.id,
+      payStartDate: myNanny.start_date,
     }
-  }, [myNanny?.id, templates])
+  }, [myNanny?.id, myNanny?.start_date, templates])
 
   const advance = advances?.find((a) => a.id === advanceId)
 

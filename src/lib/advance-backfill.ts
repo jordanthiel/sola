@@ -56,6 +56,7 @@ export interface ScheduleBackfillInput {
   blocks: ScheduleBlock[]
   templates: NannyScheduleTemplate[]
   householdNannyId: string
+  payStartDate?: string | null
 }
 
 function shiftsForPeriod(
@@ -69,6 +70,7 @@ function shiftsForPeriod(
     schedule.householdNannyId,
     periodStart,
     periodEnd,
+    schedule.payStartDate,
   )
 }
 

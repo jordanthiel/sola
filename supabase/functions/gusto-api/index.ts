@@ -9,13 +9,33 @@ import {
 import { mapSnapshotToGustoCompensations } from '../_shared/gusto-payroll-map.ts'
 import {
   getServiceSupabase,
+  requireNannyForHousehold,
   requireParentForHousehold,
+  requireGustoConfigured,
   getCompanyTokens,
   withFreshCompanyToken,
 } from '../_shared/supabase.ts'
 import { httpStatusForError, logGustoApiError } from '../_shared/log-error.ts'
 import { isEinAlreadyInUseError, resolveEinForCreate } from '../_shared/gusto-ein.ts'
 import { resolveIpForGusto } from '../_shared/client-ip.ts'
+import { requireFeatureAccess } from '../_shared/feature-gates.ts'
+import {
+  handleFinishOnboarding,
+  handleFinalizeGustoEmployeeOnboarding,
+  handleGetSetup,
+  handleInviteGustoEmployeeSelfOnboarding,
+  handleSaveBankAccount,
+  handleSaveFederalTax,
+  handleSaveIndustry,
+  handleSaveLocation,
+  handleSavePaySchedule,
+  handleSaveSignatory,
+  handleSaveStateTax,
+  handleSetupGustoEmployee,
+  handleSignForms,
+  handleSubmitGustoEmployeeSelfOnboarding,
+  handleVerifyBankAccount,
+} from '../_shared/gusto-onboarding.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -28,6 +48,8 @@ function json(body: Record<string, unknown>, status = 200) {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   })
 }
+
+const NANNY_ACTIONS = new Set(['submit_gusto_employee_details'])
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -50,7 +72,21 @@ serve(async (req) => {
 
     console.info('gusto-api request', { action, householdId, gustoEnv: getGustoEnv() })
 
-    const { userId } = await requireParentForHousehold(authHeader, householdId)
+    let userId: string
+    if (NANNY_ACTIONS.has(action)) {
+      const householdNannyId = (body.householdNannyId as string) ?? ''
+      const auth = await requireNannyForHousehold(authHeader, householdId, householdNannyId || undefined)
+      userId = auth.userId
+      if (!householdNannyId) {
+        return json({ error: 'householdNannyId is required' }, 400)
+      }
+      body.householdNannyId = auth.householdNannyId
+      await requireGustoConfigured(householdId)
+    } else {
+      const auth = await requireParentForHousehold(authHeader, householdId)
+      userId = auth.userId
+      await requireFeatureAccess(userId, 'gusto_payroll')
+    }
 
     switch (action) {
       case 'get_status':
@@ -61,6 +97,38 @@ serve(async (req) => {
         return json(await handleAcceptTerms(householdId, body, userId, req))
       case 'sync_onboarding':
         return json(await handleSyncOnboarding(householdId))
+      case 'get_setup':
+        return json(await handleGetSetup(householdId))
+      case 'save_location':
+        return json(await handleSaveLocation(householdId, body))
+      case 'save_bank_account':
+        return json(await handleSaveBankAccount(householdId, body))
+      case 'save_federal_tax':
+        return json(await handleSaveFederalTax(householdId, body))
+      case 'save_industry':
+        return json(await handleSaveIndustry(householdId, body))
+      case 'save_pay_schedule':
+        return json(await handleSavePaySchedule(householdId, body))
+      case 'save_signatory':
+        return json(await handleSaveSignatory(householdId, body))
+      case 'verify_bank_account':
+        return json(await handleVerifyBankAccount(householdId, body))
+      case 'save_state_tax':
+        return json(await handleSaveStateTax(householdId, body))
+      case 'sign_forms':
+        return json(await handleSignForms(householdId))
+      case 'finish_onboarding':
+        return json(await handleFinishOnboarding(householdId))
+      case 'setup_gusto_employee':
+        return json(await handleSetupGustoEmployee(householdId, body))
+      case 'invite_gusto_employee':
+        return json(await handleInviteGustoEmployeeSelfOnboarding(householdId, body))
+      case 'submit_gusto_employee_details':
+        return json(
+          await handleSubmitGustoEmployeeSelfOnboarding(householdId, body.householdNannyId as string, body),
+        )
+      case 'finalize_gusto_employee':
+        return json(await handleFinalizeGustoEmployeeOnboarding(householdId, body))
       case 'create_flow':
         return json(await handleCreateFlow(householdId, body))
       case 'demo_approve_company':
@@ -210,6 +278,7 @@ async function handleCreateCompany(
     companyUuid: created.company_uuid,
     onboardingStatus: 'terms_required',
     einGeneratedForDemo: generated,
+    companyEin: ein,
   }
 }
 

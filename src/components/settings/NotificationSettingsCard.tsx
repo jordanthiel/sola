@@ -1,13 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import {
   useNotificationPreferences,
   useSaveNotificationPreferences,
 } from '@/hooks/useExtendedFeatures'
+import { useDebouncedAutoSave } from '@/hooks/useDebouncedAutoSave'
 import type { NotificationCategories } from '@/types/features'
+import { AutoSaveStatus } from '@/components/settings/AutoSaveStatus'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
-import { Button } from '@/components/ui/button'
 
 const CATEGORY_LABELS: Record<keyof NotificationCategories, string> = {
   schedule: 'Schedule changes',
@@ -21,7 +22,7 @@ const CATEGORY_LABELS: Record<keyof NotificationCategories, string> = {
 }
 
 export function NotificationSettingsCard() {
-  const { data: prefs } = useNotificationPreferences()
+  const { data: prefs, isLoading } = useNotificationPreferences()
   const save = useSaveNotificationPreferences()
   const [emailEnabled, setEmailEnabled] = useState(true)
   const [inAppEnabled, setInAppEnabled] = useState(true)
@@ -35,15 +36,41 @@ export function NotificationSettingsCard() {
     }
   }, [prefs])
 
+  const hasChanges = useMemo(() => {
+    if (!prefs || !categories) return false
+    return (
+      emailEnabled !== prefs.email_enabled ||
+      inAppEnabled !== prefs.in_app_enabled ||
+      JSON.stringify(categories) !== JSON.stringify(prefs.categories)
+    )
+  }, [categories, emailEnabled, inAppEnabled, prefs])
+
+  useDebouncedAutoSave(
+    () => {
+      if (!hasChanges || !categories || save.isPending) return
+      save.mutate(
+        { email_enabled: emailEnabled, in_app_enabled: inAppEnabled, categories },
+        { onError: () => toast.error('Failed to save notification preferences') },
+      )
+    },
+    [hasChanges, emailEnabled, inAppEnabled, categories],
+    { ready: !isLoading && !!prefs && !!categories, enabled: hasChanges },
+  )
+
   if (!categories) return null
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Notifications</CardTitle>
-        <CardDescription>
-          Control in-app and email alerts. Email requires RESEND_API_KEY on your Supabase project.
-        </CardDescription>
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <CardTitle className="text-lg">Notifications</CardTitle>
+            <CardDescription>
+              Control in-app and email alerts. Email requires RESEND_API_KEY on your Supabase project.
+            </CardDescription>
+          </div>
+          <AutoSaveStatus isPending={save.isPending} isError={save.isError} />
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         <label className="flex items-center gap-2 text-sm">
@@ -77,20 +104,6 @@ export function NotificationSettingsCard() {
             </label>
           ))}
         </div>
-        <Button
-          onClick={() =>
-            save.mutate(
-              { email_enabled: emailEnabled, in_app_enabled: inAppEnabled, categories },
-              {
-                onSuccess: () => toast.success('Preferences saved'),
-                onError: () => toast.error('Failed to save'),
-              },
-            )
-          }
-          disabled={save.isPending}
-        >
-          {save.isPending ? 'Saving...' : 'Save preferences'}
-        </Button>
       </CardContent>
     </Card>
   )

@@ -2,6 +2,7 @@ import { format, parseISO } from 'date-fns'
 import { Baby, CalendarOff, Clock, Sparkles } from 'lucide-react'
 import type { CalendarEvent } from '@/lib/calendar-events'
 import { isTemplateOccurrence } from '@/lib/schedule'
+import { PlanPeopleChips } from '@/components/activities/PlanPeopleChips'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -59,7 +60,16 @@ export function ScheduleEventRow({
       <section className="flex min-w-0 flex-1 gap-2">
         <KindIcon kind={event.kind} />
         <section className="min-w-0">
-          <p className={cn('font-medium', compact && 'text-sm')}>{event.title}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className={cn('font-medium', compact && 'text-sm')}>{event.title}</p>
+            {event.kind === 'activity' && (
+              <PlanPeopleChips
+                children={event.childAttendees}
+                attendeeLabel={event.attendeeLabel}
+                size={compact ? 'sm' : 'md'}
+              />
+            )}
+          </div>
           <p className={cn('text-sm text-[var(--color-muted-foreground)]', compact && 'text-xs')}>
             {formatEventTime(event)}
           </p>

@@ -37,10 +37,10 @@ Until confirmed, treat Embedded as general small-employer payroll and use demo s
 
 ### Settings → Gusto payroll
 
-1. Parent accepts Gusto Embedded ToS and creates a partner-managed company.
-2. Parent accepts terms via API (`accept_terms`).
-3. Complete Gusto onboarding at **Settings → Continue company setup** (`/settings/gusto`, calls `POST /v1/companies/{uuid}/flows`). Individual steps open from the checklist after **Refresh status** (`sync_onboarding`).
-4. **Demo only:** use “Demo: approve company” after `finish_onboarding` (calls `PUT /companies/{uuid}/approve`).
+1. Parent creates a partner-managed company and accepts Gusto Embedded ToS in Soola (API only — no Gusto redirect).
+2. Complete company setup in Soola using the step-by-step wizard (address, bank, federal tax, industry, pay schedule, bank verification, signatory, forms). Each step calls Gusto REST APIs via `gusto-api`.
+3. Link each nanny on **Earnings** with in-app employee details (DOB, SSN, home address, job/compensation via API).
+4. **Demo only:** use “Demo: approve company” after `finish_onboarding`.
 5. Production: wait for `company.approved` webhook.
 
 ### Per nanny
@@ -81,3 +81,7 @@ Gusto requires before production API access:
 - OAuth tokens live in `gusto_companies` — **no client SELECT** on token columns; parents use `gusto_companies_public` view.
 - All Gusto API calls go through `gusto-api` Edge Function with parent auth check.
 - Do not store SSN or bank numbers in `pay_period_closes.snapshot`.
+
+Testing in Demo: When using the Gusto Demo Environment, you can test the system using the sample routing number 102001017 and sample account number
+
+Standard Mock EIN: 00-0000000 or 12-3456789.

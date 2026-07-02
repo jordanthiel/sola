@@ -16,6 +16,10 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { ChildrenMultiSelect } from '@/components/activities/ChildrenMultiSelect'
 import { RecurringPlansCard } from '@/components/activities/RecurringPlansCard'
 import { insertChildPlan } from '@/lib/child-plans-multi'
+import type { ChildColorKey } from '@/lib/child-colors'
+import { groupChildActivities, childAttendeesFromGroup, type ChildActivityWithChild } from '@/lib/group-child-activities'
+import { enrichActivitiesWithAttendeeLabels } from '@/lib/plan-attendee'
+import { PlanPeopleChips } from '@/components/activities/PlanPeopleChips'
 import {
   activityTypeLabel,
   minutesBetween,
@@ -24,7 +28,6 @@ import {
 import { defaultPlanDatetimeRange, fromDatetimeLocalValue } from '@/lib/calendar-slot'
 import {
   defaultPlanAttendeeFromSchedule,
-  formatPlanAttendeeLabel,
   planAttendeeToFields,
   type PlanAttendeeValue,
 } from '@/lib/plan-attendee'
@@ -154,10 +157,22 @@ export function ActivitiesPage() {
   })
 
   const now = Date.now()
-  const upcoming =
-    activities?.filter((a) => parseISO(a.occurred_at).getTime() >= now - 30 * 60 * 1000) ?? []
-  const past =
-    activities?.filter((a) => parseISO(a.occurred_at).getTime() < now - 30 * 60 * 1000) ?? []
+  const enrichedActivities = useMemo(
+    () =>
+      enrichActivitiesWithAttendeeLabels(activities ?? [], {
+        members,
+        nannies,
+        currentUserId: user?.id,
+        currentUserEmail: user?.email,
+      }),
+    [activities, members, nannies, user?.id, user?.email],
+  )
+  const upcomingRaw =
+    enrichedActivities.filter((a) => parseISO(a.occurred_at).getTime() >= now - 30 * 60 * 1000)
+  const pastRaw =
+    enrichedActivities.filter((a) => parseISO(a.occurred_at).getTime() < now - 30 * 60 * 1000)
+  const upcoming = groupChildActivities(upcomingRaw as ChildActivityWithChild[])
+  const past = groupChildActivities(pastRaw as ChildActivityWithChild[])
 
   return (
     <article className="space-y-6">
@@ -301,24 +316,10 @@ export function ActivitiesPage() {
           ) : (
             <>
               {upcoming.length > 0 && (
-                <PlanList
-                  title="Coming up"
-                  items={upcoming}
-                  members={members}
-                  nannies={nannies}
-                  currentUserId={user?.id}
-                  currentUserEmail={user?.email}
-                />
+                <PlanList title="Coming up" items={upcoming} />
               )}
               {past.length > 0 && (
-                <PlanList
-                  title="Earlier"
-                  items={past}
-                  members={members}
-                  nannies={nannies}
-                  currentUserId={user?.id}
-                  currentUserEmail={user?.email}
-                />
+                <PlanList title="Earlier" items={past} />
               )}
             </>
           )}
@@ -331,10 +332,6 @@ export function ActivitiesPage() {
 function PlanList({
   title,
   items,
-  members,
-  nannies,
-  currentUserId,
-  currentUserEmail,
 }: {
   title: string
   items: {
@@ -347,40 +344,35 @@ function PlanList({
     mood: MoodType | null
     attendee_user_id: string | null
     attendee_household_nanny_id: string | null
-    children?: { name: string } | null
+    childIds: string[]
+    childNames: string[]
+    childColorKeys: ChildColorKey[]
+    attendeeLabel?: string | null
   }[]
-  members?: Parameters<typeof formatPlanAttendeeLabel>[1]['members']
-  nannies?: Parameters<typeof formatPlanAttendeeLabel>[1]['nannies']
-  currentUserId?: string
-  currentUserEmail?: string | null
 }) {
   return (
     <section>
       <h3 className="mb-2 text-sm font-semibold text-[var(--color-muted-foreground)]">{title}</h3>
       <ul className="space-y-3">
-        {items.map((a) => {
-          const attendeeLabel = formatPlanAttendeeLabel(a, {
-            members,
-            nannies,
-            currentUserId,
-            currentUserEmail,
-          })
-          return (
+        {items.map((a) => (
           <li key={a.id} className="border-b pb-3 last:border-0">
             <header className="flex flex-wrap items-center gap-2">
               <p className="font-medium">{a.title}</p>
+              <PlanPeopleChips
+                children={childAttendeesFromGroup(a)}
+                attendeeLabel={a.attendeeLabel}
+                size="sm"
+              />
               <Badge variant="outline">{activityTypeLabel(a.activity_type)}</Badge>
               {a.mood && <Badge variant="secondary">{a.mood}</Badge>}
             </header>
             <p className="text-sm text-[var(--color-muted-foreground)]">
-              {a.children?.name} · {format(parseISO(a.occurred_at), 'EEE, MMM d · h:mm a')}
+              {format(parseISO(a.occurred_at), 'EEE, MMM d · h:mm a')}
               {a.duration_minutes ? ` · ${a.duration_minutes} min` : ''}
-              {attendeeLabel ? ` · ${attendeeLabel} going` : ''}
             </p>
             {a.description && <p className="mt-1 text-sm">{a.description}</p>}
           </li>
-          )
-        })}
+        ))}
       </ul>
     </section>
   )

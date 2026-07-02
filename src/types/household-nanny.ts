@@ -14,6 +14,7 @@ export interface HouseholdNanny {
   claimed_at: string | null
   deactivated_at: string | null
   deactivated_by: string | null
+  start_date: string
   created_at: string
   updated_at: string
 }

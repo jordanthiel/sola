@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useHousehold } from '@/contexts/HouseholdContext'
 import { useScheduleTemplates } from '@/hooks/useHouseholdData'
+import { useDebouncedAutoSave } from '@/hooks/useDebouncedAutoSave'
 import { formatSupabaseError } from '@/lib/errors'
+import { AutoSaveStatus } from '@/components/settings/AutoSaveStatus'
 import { Button } from '@/components/ui/button'
 import { TimePicker } from '@/components/ui/time-picker'
 import {
@@ -12,9 +14,19 @@ import {
   emptyWeekDraft,
   type DayScheduleDraft,
 } from '@/types/schedule-template'
+import type { NannyScheduleTemplate } from '@/types/schedule-template'
 
 interface DefaultScheduleEditorProps {
   householdNannyId: string
+}
+
+function draftMatchesTemplates(
+  draft: DayScheduleDraft[],
+  templates: NannyScheduleTemplate[] | undefined,
+): boolean {
+  if (!templates) return true
+  const fromServer = draftFromTemplates(templates)
+  return JSON.stringify(fromServer) === JSON.stringify(draft)
 }
 
 export function DefaultScheduleEditor({ householdNannyId }: DefaultScheduleEditorProps) {
@@ -32,6 +44,11 @@ export function DefaultScheduleEditor({ householdNannyId }: DefaultScheduleEdito
       setDraft(emptyWeekDraft())
     }
   }, [templates, householdNannyId])
+
+  const hasChanges = useMemo(
+    () => !draftMatchesTemplates(draft, templates),
+    [draft, templates],
+  )
 
   const saveTemplates = useMutation({
     mutationFn: async () => {
@@ -51,7 +68,6 @@ export function DefaultScheduleEditor({ householdNannyId }: DefaultScheduleEdito
     },
     onSuccess: () => {
       setError('')
-      setMessage('Default schedule saved.')
       qc.invalidateQueries({ queryKey: ['schedule_templates'] })
     },
     onError: (err) => {
@@ -59,6 +75,15 @@ export function DefaultScheduleEditor({ householdNannyId }: DefaultScheduleEdito
       setError(formatSupabaseError(err))
     },
   })
+
+  useDebouncedAutoSave(
+    () => {
+      if (!hasChanges || saveTemplates.isPending) return
+      saveTemplates.mutate()
+    },
+    [hasChanges],
+    { ready: !isLoading, enabled: hasChanges },
+  )
 
   const syncToCalendar = useMutation({
     mutationFn: async () => {
@@ -103,6 +128,10 @@ export function DefaultScheduleEditor({ householdNannyId }: DefaultScheduleEdito
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center justify-end">
+        <AutoSaveStatus isPending={saveTemplates.isPending} isError={saveTemplates.isError} />
+      </div>
+
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -162,9 +191,6 @@ export function DefaultScheduleEditor({ householdNannyId }: DefaultScheduleEdito
       {message && <p className="text-sm text-emerald-700">{message}</p>}
 
       <div className="flex flex-wrap gap-2">
-        <Button onClick={() => saveTemplates.mutate()} disabled={saveTemplates.isPending}>
-          {saveTemplates.isPending ? 'Saving...' : 'Save default schedule'}
-        </Button>
         <Button
           variant="outline"
           onClick={() => syncToCalendar.mutate()}
@@ -175,8 +201,8 @@ export function DefaultScheduleEditor({ householdNannyId }: DefaultScheduleEdito
       </div>
 
       <p className="text-xs text-[var(--color-muted-foreground)]">
-        This is the usual week. On the Schedule page, change individual days when times differ, or let
-        your nanny note if they worked late.
+        Changes save automatically. Use &ldquo;Apply to calendar&rdquo; to add upcoming shifts from
+        this template.
       </p>
     </div>
   )
