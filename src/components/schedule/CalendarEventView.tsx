@@ -149,8 +149,9 @@ export function CalendarEventView({
         <div className="space-y-2 text-sm text-[var(--color-muted-foreground)]">
           <p>
             This holiday adds a full paid day automatically in Earnings. If the nanny actually
-            worked, add a shift for the holiday and keep "Nanny actually worked this holiday"
-            checked so those hours count toward overtime.
+            worked, add a shift for only the hours worked. Those worked hours are added on top of
+            the holiday credit and only become overtime once total paid holiday + worked hours are
+            over the regular-hours cap.
           </p>
           <p>
             Change which holidays are off in{' '}
@@ -171,7 +172,7 @@ export function CalendarEventView({
         )}
         {isParent && isHoliday && onAddHolidayShift && (
           <Button size="sm" variant="outline" onClick={onAddHolidayShift}>
-            Add worked shift
+            Add actual hours worked
           </Button>
         )}
         {canEdit && (

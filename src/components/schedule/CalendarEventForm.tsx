@@ -527,10 +527,11 @@ export function CalendarEventForm({
                 onChange={(e) => setHolidayWorked(e.target.checked)}
               />
               <span>
-                <span className="font-medium">Nanny actually worked this holiday</span>
+                <span className="font-medium">Count this shift as actual holiday hours worked</span>
                 <span className="mt-0.5 block text-sm text-[var(--color-muted-foreground)]">
-                  If this date is a paid holiday, these shift hours count toward the period total and
-                  overtime threshold in addition to the automatic full-day holiday hours.
+                  If this date is a paid holiday, set Start and End to only the hours actually
+                  worked. Those hours are added on top of the automatic full-day holiday credit and
+                  share the same overtime threshold.
                 </span>
               </span>
             </label>

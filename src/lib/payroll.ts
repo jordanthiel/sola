@@ -88,6 +88,8 @@ export function calculatePayroll(
   const holidayMinutes = holidayPayItems.reduce((sum, item) => sum + item.minutes, 0)
   const holidayWorkedMinutes = holidayPayItems.reduce((sum, item) => sum + item.workedMinutes, 0)
   const holidayPayCents = holidayPayItems.reduce((sum, item) => sum + item.payCents, 0)
+  // Holiday credit and actual worked holiday shifts share the same regular/OT threshold.
+  // Example: 8h paid holiday + 4h worked holiday + 32h other work => 4h overtime.
   const totalMinutes = workedMinutes + holidayMinutes
   const overnightMinutes = workedShifts.reduce(
     (sum, s) => sum + payableShiftOvernightMinutes(s, settings),
