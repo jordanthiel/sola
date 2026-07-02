@@ -42,7 +42,7 @@ export function PayReportingBreakdown({
         <dl className="grid gap-2 border-t pt-3 text-[var(--color-muted-foreground)] sm:grid-cols-2">
           {regularPayCents > 0 && (
             <ReportingDetailRow
-              label="Regular pay"
+              label="Regular / special pay"
               over={reporting.regularOverCents}
               under={reporting.regularUnderCents}
             />

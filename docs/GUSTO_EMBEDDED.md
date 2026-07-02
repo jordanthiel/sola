@@ -82,6 +82,6 @@ Gusto requires before production API access:
 - All Gusto API calls go through `gusto-api` Edge Function with parent auth check.
 - Do not store SSN or bank numbers in `pay_period_closes.snapshot`.
 
-Testing in Demo: When using the Gusto Demo Environment, you can test the system using the sample routing number 102001017 and sample account number 
+Testing in Demo: When using the Gusto Demo Environment, you can test the system using the sample routing number 102001017 and sample account number
 
 Standard Mock EIN: 00-0000000 or 12-3456789.

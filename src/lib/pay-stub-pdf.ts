@@ -24,6 +24,19 @@ export function generatePayStubPdf(snapshot: PayrollSnapshot): jsPDF {
   line(`Total hours: ${(snapshot.totalMinutes / 60).toFixed(2)}`)
   line(`Regular: ${(snapshot.regularMinutes / 60).toFixed(2)} hrs — ${formatCurrency(snapshot.regularPayCents)}`)
   line(`Overtime: ${(snapshot.overtimeMinutes / 60).toFixed(2)} hrs — ${formatCurrency(snapshot.overtimePayCents)}`)
+  if ((snapshot.holidayMinutes ?? 0) > 0) {
+    line(
+      `Paid holidays: ${((snapshot.holidayMinutes ?? 0) / 60).toFixed(2)} hrs included above`,
+    )
+  }
+  if ((snapshot.overnightPayCents ?? 0) > 0) {
+    line(
+      `Overnight premium: ${((snapshot.overnightMinutes ?? 0) / 60).toFixed(2)} hrs — ${formatCurrency(snapshot.overnightPayCents ?? 0)}`,
+    )
+  }
+  if ((snapshot.vacationPayCents ?? 0) > 0) {
+    line(`Vacation: ${snapshot.vacationDays ?? 0} days — ${formatCurrency(snapshot.vacationPayCents ?? 0)}`)
+  }
   if (snapshot.lineItemsTotalCents > 0) {
     line(`Bonuses / mileage / reimbursements: ${formatCurrency(snapshot.lineItemsTotalCents)}`)
   }

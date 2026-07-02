@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { selectCn } from '@/lib/utils'
 
-const PARENT_TIME_OFF_TYPES: TimeOffType[] = ['sick', 'pto']
+const PARENT_TIME_OFF_TYPES: TimeOffType[] = ['sick', 'pto', 'vacation']
 
 export function LogTimeOffForm({ onSuccess }: { onSuccess?: () => void }) {
   const { user } = useAuth()
@@ -31,6 +31,8 @@ export function LogTimeOffForm({ onSuccess }: { onSuccess?: () => void }) {
   const [endsOn, setEndsOn] = useState('')
   const [hours, setHours] = useState('8')
   const [notes, setNotes] = useState('')
+  const [nannyJoinsVacation, setNannyJoinsVacation] = useState(false)
+  const [vacationDailyRate, setVacationDailyRate] = useState('')
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -47,6 +49,7 @@ export function LogTimeOffForm({ onSuccess }: { onSuccess?: () => void }) {
       if (Number.isNaN(parsedHours) || parsedHours <= 0) {
         throw new Error('Enter a valid number of hours')
       }
+      const vacationRate = vacationDailyRate.trim() === '' ? null : parseFloat(vacationDailyRate)
       const { error: insertError } = await supabase.from('time_off_requests').insert({
         household_id: activeHousehold!.id,
         household_nanny_id: nannyId,
@@ -55,6 +58,11 @@ export function LogTimeOffForm({ onSuccess }: { onSuccess?: () => void }) {
         ends_on: endsOn,
         hours: parsedHours,
         notes: notes.trim() || null,
+        nanny_joins_vacation: type === 'vacation' ? nannyJoinsVacation : false,
+        vacation_daily_rate_cents:
+          type === 'vacation' && vacationRate !== null && Number.isFinite(vacationRate)
+            ? Math.round(vacationRate * 100)
+            : null,
         status: 'approved',
         reviewed_by: user!.id,
         reviewed_at: new Date().toISOString(),
@@ -64,6 +72,8 @@ export function LogTimeOffForm({ onSuccess }: { onSuccess?: () => void }) {
     onSuccess: () => {
       setError('')
       setNotes('')
+      setNannyJoinsVacation(false)
+      setVacationDailyRate('')
       void invalidateTimeOffQueries(qc)
       toast.success('Time off logged')
       onSuccess?.()
@@ -85,8 +95,8 @@ export function LogTimeOffForm({ onSuccess }: { onSuccess?: () => void }) {
   return (
     <div className="space-y-4">
       <p className="text-sm text-[var(--color-muted-foreground)]">
-        Record sick or PTO for a nanny on their behalf. This is saved as approved and deducts from
-        their balance.
+        Record sick time, PTO, or a family vacation day for a nanny on their behalf. Sick and PTO
+        deduct from their balance; vacation pay applies only when the nanny joins.
       </p>
 
       <div className="space-y-2">
@@ -123,7 +133,7 @@ export function LogTimeOffForm({ onSuccess }: { onSuccess?: () => void }) {
         >
           {PARENT_TIME_OFF_TYPES.map((t) => (
             <option key={t} value={t}>
-              {t === 'sick' ? 'Sick' : 'PTO'}
+              {t === 'sick' ? 'Sick' : t === 'pto' ? 'PTO' : 'Vacation'}
             </option>
           ))}
         </select>
@@ -144,7 +154,9 @@ export function LogTimeOffForm({ onSuccess }: { onSuccess?: () => void }) {
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="log-time-off-hours">Hours</Label>
+          <Label htmlFor="log-time-off-hours">
+            {type === 'vacation' ? 'Hours (for records)' : 'Hours'}
+          </Label>
           <Input
             id="log-time-off-hours"
             type="number"
@@ -161,6 +173,38 @@ export function LogTimeOffForm({ onSuccess }: { onSuccess?: () => void }) {
           This exceeds remaining {type === 'sick' ? 'sick' : 'PTO'} balance ({formatPtoHours(remaining)}).
           You can still log it if needed.
         </p>
+      )}
+
+      {type === 'vacation' && (
+        <div className="space-y-3 rounded-md border p-3">
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={nannyJoinsVacation}
+              onChange={(e) => setNannyJoinsVacation(e.target.checked)}
+            />
+            <span>
+              <span className="font-medium">Nanny joins this vacation</span>
+              <span className="mt-0.5 block text-sm text-[var(--color-muted-foreground)]">
+                When checked, this approved vacation day can be included in Earnings.
+              </span>
+            </span>
+          </label>
+          {nannyJoinsVacation && (
+            <div className="space-y-2">
+              <Label htmlFor="log-vacation-rate">Vacation rate ($/day)</Label>
+              <Input
+                id="log-vacation-rate"
+                type="number"
+                step="0.01"
+                value={vacationDailyRate}
+                onChange={(e) => setVacationDailyRate(e.target.value)}
+                placeholder="Use nanny default"
+              />
+            </div>
+          )}
+        </div>
       )}
 
       <div className="space-y-2">

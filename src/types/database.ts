@@ -9,7 +9,7 @@ export type PayPeriodType = 'weekly' | 'biweekly' | 'monthly'
 export type PayReportingMode = 'all_over' | 'all_under' | 'split' | 'regular_over_ot_under'
 export type AdvanceStatus = 'open' | 'applied' | 'void'
 export type AdvanceRepaymentMode = 'per_paycheck' | 'overtime_only'
-export type TimeOffType = 'sick' | 'pto' | 'unpaid'
+export type TimeOffType = 'sick' | 'pto' | 'unpaid' | 'vacation'
 export type TimeOffStatus = 'pending' | 'approved' | 'denied'
 export type ActivityType =
   | 'meal'
@@ -253,6 +253,10 @@ export interface Database {
           pay_reporting_mode: PayReportingMode
           over_table_percent: number
           auto_record_advance_repayments: boolean
+          overnight_rate_cents: number | null
+          overnight_start_time: string
+          overnight_end_time: string
+          vacation_daily_rate_cents: number | null
           created_at: string
           updated_at: string
         }
@@ -271,12 +275,17 @@ export interface Database {
           pay_reporting_mode?: PayReportingMode
           over_table_percent?: number
           auto_record_advance_repayments?: boolean
+          overnight_rate_cents?: number | null
+          overnight_start_time?: string
+          overnight_end_time?: string
+          vacation_daily_rate_cents?: number | null
           created_at?: string
           updated_at?: string
         }
         Update: {
           id?: string
           household_id?: string
+          household_nanny_id?: string
           nanny_user_id?: string
           hourly_rate_cents?: number
           overtime_multiplier?: number
@@ -288,6 +297,10 @@ export interface Database {
           pay_reporting_mode?: PayReportingMode
           over_table_percent?: number
           auto_record_advance_repayments?: boolean
+          overnight_rate_cents?: number | null
+          overnight_start_time?: string
+          overnight_end_time?: string
+          vacation_daily_rate_cents?: number | null
           created_at?: string
           updated_at?: string
         }
@@ -387,6 +400,11 @@ export interface Database {
           break_minutes: number
           notes: string | null
           status: ScheduleStatus
+          is_overnight: boolean
+          overnight_rate_cents: number | null
+          overnight_start_time: string | null
+          overnight_end_time: string | null
+          holiday_worked: boolean
           created_at: string
           updated_at: string
         }
@@ -402,12 +420,18 @@ export interface Database {
           break_minutes?: number
           notes?: string | null
           status?: ScheduleStatus
+          is_overnight?: boolean
+          overnight_rate_cents?: number | null
+          overnight_start_time?: string | null
+          overnight_end_time?: string | null
+          holiday_worked?: boolean
           created_at?: string
           updated_at?: string
         }
         Update: {
           id?: string
           household_id?: string
+          household_nanny_id?: string
           nanny_user_id?: string
           starts_at?: string
           ends_at?: string
@@ -416,6 +440,11 @@ export interface Database {
           break_minutes?: number
           notes?: string | null
           status?: ScheduleStatus
+          is_overnight?: boolean
+          overnight_rate_cents?: number | null
+          overnight_start_time?: string | null
+          overnight_end_time?: string | null
+          holiday_worked?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -599,6 +628,8 @@ export interface Database {
           hours: number
           status: TimeOffStatus
           notes: string | null
+          nanny_joins_vacation: boolean
+          vacation_daily_rate_cents: number | null
           review_notes: string | null
           reviewed_by: string | null
           reviewed_at: string | null
@@ -616,6 +647,8 @@ export interface Database {
           hours: number
           status?: TimeOffStatus
           notes?: string | null
+          nanny_joins_vacation?: boolean
+          vacation_daily_rate_cents?: number | null
           review_notes?: string | null
           reviewed_by?: string | null
           reviewed_at?: string | null
@@ -625,6 +658,7 @@ export interface Database {
         Update: {
           id?: string
           household_id?: string
+          household_nanny_id?: string
           nanny_user_id?: string
           type?: TimeOffType
           starts_on?: string
@@ -632,6 +666,8 @@ export interface Database {
           hours?: number
           status?: TimeOffStatus
           notes?: string | null
+          nanny_joins_vacation?: boolean
+          vacation_daily_rate_cents?: number | null
           review_notes?: string | null
           reviewed_by?: string | null
           reviewed_at?: string | null
@@ -1154,6 +1190,11 @@ export interface Database {
           p_starts_at: string
           p_ends_at: string
           p_notes?: string | null
+          p_is_overnight?: boolean
+          p_overnight_rate_cents?: number | null
+          p_overnight_start_time?: string | null
+          p_overnight_end_time?: string | null
+          p_holiday_worked?: boolean
         }
         Returns: string
       }

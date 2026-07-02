@@ -7,6 +7,7 @@ export interface ShiftHoursLine {
   timeRange: string
   minutes: number
   isFromTemplate: boolean
+  isOvernight: boolean
 }
 
 export interface DailyHoursRow {
@@ -50,6 +51,7 @@ export function buildDailyHoursBreakdown(shifts: PayableShift[]): DailyHoursRow[
         timeRange: formatShiftTimeRange(s),
         minutes: payableShiftMinutes(s),
         isFromTemplate: s.isFromTemplate,
+        isOvernight: s.is_overnight ?? false,
       }))
       const minutes = shiftLines.reduce((sum, line) => sum + line.minutes, 0)
       return {

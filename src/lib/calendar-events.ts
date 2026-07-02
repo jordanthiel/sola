@@ -46,6 +46,8 @@ export interface CalendarEvent {
   timeOffType?: TimeOffType
   timeOffStatus?: TimeOffRequest['status']
   timeOffHours?: number
+  timeOffNannyJoinsVacation?: boolean
+  timeOffVacationRateCents?: number | null
   timeOffReviewNotes?: string | null
   activityType?: ActivityType
   childId?: string
@@ -62,6 +64,7 @@ export interface CalendarEvent {
   attendeeLabel?: string | null
   hasLate?: boolean
   isTemplate?: boolean
+  holidayWorked?: boolean
   holidayKey?: FederalHolidayKey
 }
 
@@ -69,6 +72,7 @@ const TIME_OFF_LABELS: Record<TimeOffType, string> = {
   sick: 'Sick time',
   pto: 'PTO',
   unpaid: 'Unpaid time off',
+  vacation: 'Vacation',
 }
 
 function scheduleItemTimes(item: ScheduleItem): { start: Date; end: Date } {
@@ -89,7 +93,11 @@ export function scheduleItemToEvent(item: ScheduleItem, nannyLabel: string): Cal
     id: item.id,
     kind: 'shift',
     title: nannyLabel,
-    subtitle: isTpl ? item.notes : item.notes,
+    subtitle: block?.is_overnight
+      ? ['Overnight', block.notes].filter(Boolean).join(' · ')
+      : isTpl
+        ? item.notes
+        : item.notes,
     startsAt: start,
     endsAt: end,
     allDay: false,
@@ -98,18 +106,23 @@ export function scheduleItemToEvent(item: ScheduleItem, nannyLabel: string): Cal
     householdNannyId: item.household_nanny_id,
     hasLate: block ? blockHasLateReport(block) : false,
     isTemplate: isTpl,
+    holidayWorked: block?.holiday_worked ?? false,
   }
 }
 
 export function timeOffToEvent(req: TimeOffRequest, nannyLabel: string): CalendarEvent {
   const start = startOfDay(parseISO(req.starts_on))
   const end = endOfDay(parseISO(req.ends_on))
+  const vacationPay =
+    req.type === 'vacation' && req.nanny_joins_vacation
+      ? `Nanny joins${req.vacation_daily_rate_cents ? ` · $${(req.vacation_daily_rate_cents / 100).toFixed(2)}/day` : ''}`
+      : null
 
   return {
     id: `time-off-${req.id}`,
     kind: 'time_off',
     title: TIME_OFF_LABELS[req.type],
-    subtitle: `${nannyLabel}${req.notes ? ` · ${req.notes}` : ''}`,
+    subtitle: [nannyLabel, vacationPay, req.notes].filter(Boolean).join(' · '),
     startsAt: start,
     endsAt: end,
     allDay: true,
@@ -118,6 +131,8 @@ export function timeOffToEvent(req: TimeOffRequest, nannyLabel: string): Calenda
     timeOffType: req.type,
     timeOffStatus: req.status,
     timeOffHours: req.hours,
+    timeOffNannyJoinsVacation: req.nanny_joins_vacation,
+    timeOffVacationRateCents: req.vacation_daily_rate_cents,
     description: req.notes,
     timeOffReviewNotes: req.review_notes,
   }
@@ -184,7 +199,7 @@ export function holidayToEvent(occurrence: FederalHolidayOccurrence): CalendarEv
     id: `holiday-${occurrence.key}-${dateKey}`,
     kind: 'holiday',
     title: occurrence.name,
-    subtitle: 'Paid holiday — nanny off',
+    subtitle: 'Paid holiday - full day hours added automatically',
     startsAt: start,
     endsAt: end,
     allDay: true,

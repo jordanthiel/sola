@@ -202,7 +202,6 @@ function FeatureGateEditor({
     </div>
   )
 }
-
 export function FeatureGateSettings() {
   const qc = useQueryClient()
 
@@ -285,4 +284,3 @@ export function FeatureGateSettings() {
     </Card>
   )
 }
-

@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useHousehold } from '@/contexts/HouseholdContext'
 import { useMyNannyAccess } from '@/hooks/useMyNannyAccess'
+import { useHouseholdHolidays } from '@/hooks/useHouseholdHolidays'
 import {
   useEmploymentSettings,
   useNannies,
@@ -15,6 +16,7 @@ import {
   useScheduleBlocks,
   useScheduleTemplates,
   useTimeEntries,
+  useTimeOffRequests,
 } from '@/hooks/useHouseholdData'
 import {
   usePayPeriodClose,
@@ -100,6 +102,8 @@ export function PayrollPage() {
   const { data: advances } = usePaymentAdvances(householdNannyId)
   const { data: advanceRepayments } = useAdvanceRepayments(householdNannyId)
   const { data: timeEntries } = useTimeEntries(from, to, householdNannyId)
+  const { data: timeOffRequests } = useTimeOffRequests()
+  const { data: holidayOverrides } = useHouseholdHolidays()
   const { data: lineItems } = usePayrollLineItems(householdNannyId, periodStartStr)
   const { data: periodClose } = usePayPeriodClose(householdNannyId, periodStartStr)
   const { data: closes } = usePayPeriodCloses(householdNannyId)
@@ -136,7 +140,10 @@ export function PayrollPage() {
         : []
 
     const actualShifts = timeEntries?.length
-      ? filterPayableShiftsByStartDate(timeEntriesToPayableShifts(timeEntries), payStartDate)
+      ? filterPayableShiftsByStartDate(
+          timeEntriesToPayableShifts(timeEntries, blocks ?? []),
+          payStartDate,
+        )
       : scheduledShifts
 
     return hoursBasis === 'actual' ? actualShifts : scheduledShifts
@@ -152,8 +159,19 @@ export function PayrollPage() {
       period.end,
       advances ?? [],
       lineItems ?? [],
+      timeOffRequests ?? [],
+      holidayOverrides ?? [],
     )
-  }, [settings, period, householdNannyId, advances, lineItems, payableShifts])
+  }, [
+    settings,
+    period,
+    householdNannyId,
+    advances,
+    lineItems,
+    payableShifts,
+    timeOffRequests,
+    holidayOverrides,
+  ])
 
   const displaySummary = useMemo(() => {
     if (isDeactivated && periodClose?.snapshot) {
@@ -451,6 +469,7 @@ export function PayrollPage() {
                         totalMinutes={displaySummary.totalMinutes}
                         regularMinutes={displaySummary.regularMinutes}
                         overtimeMinutes={displaySummary.overtimeMinutes}
+                        holidayItems={displaySummary.holidayPayItems}
                         hoursBasis={hoursBasis}
                         periodLabel={periodLabel}
                       />
@@ -469,6 +488,7 @@ export function PayrollPage() {
                         totalMinutes={displaySummary.totalMinutes}
                         regularMinutes={displaySummary.regularMinutes}
                         overtimeMinutes={displaySummary.overtimeMinutes}
+                        holidayItems={displaySummary.holidayPayItems}
                         hoursBasis={hoursBasis}
                         periodLabel={periodLabel}
                       />
@@ -487,11 +507,28 @@ export function PayrollPage() {
                         totalMinutes={displaySummary.totalMinutes}
                         regularMinutes={displaySummary.regularMinutes}
                         overtimeMinutes={displaySummary.overtimeMinutes}
+                        holidayItems={displaySummary.holidayPayItems}
                         hoursBasis={hoursBasis}
                         periodLabel={periodLabel}
                       />
                     ) : undefined
                   }
+                />
+                <Stat
+                  label="Holiday hours"
+                  value={displaySummary ? formatHours(displaySummary.holidayMinutes) : '—'}
+                />
+                <Stat
+                  label="Worked holiday hours"
+                  value={displaySummary ? formatHours(displaySummary.holidayWorkedMinutes) : '—'}
+                />
+                <Stat
+                  label="Overnight premium"
+                  value={displaySummary ? formatCurrency(displaySummary.overnightPayCents) : '—'}
+                />
+                <Stat
+                  label="Vacation pay"
+                  value={displaySummary ? formatCurrency(displaySummary.vacationPayCents) : '—'}
                 />
                 <Stat label="Gross pay" value={displaySummary ? formatCurrency(displaySummary.grossPayCents) : '—'} />
                 <Stat
@@ -544,7 +581,11 @@ export function PayrollPage() {
               {displaySummary && (
                 <PayReportingBreakdown
                   reporting={displaySummary.reporting}
-                  regularPayCents={displaySummary.regularPayCents}
+                  regularPayCents={
+                    displaySummary.regularPayCents +
+                    displaySummary.overnightPayCents +
+                    displaySummary.vacationPayCents
+                  }
                   overtimePayCents={displaySummary.overtimePayCents}
                   lineItemsTotalCents={displaySummary.lineItemsTotalCents}
                   arrangementLabel={payReportingExtras.payReportingLabel}
