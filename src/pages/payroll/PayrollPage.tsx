@@ -515,7 +515,7 @@ export function PayrollPage() {
                   }
                 />
                 <Stat
-                  label="Holiday hours"
+                  label="Paid holiday hours"
                   value={displaySummary ? formatHours(displaySummary.holidayMinutes) : '—'}
                 />
                 <Stat

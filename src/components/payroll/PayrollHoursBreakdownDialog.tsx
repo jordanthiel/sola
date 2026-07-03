@@ -102,8 +102,18 @@ export function PayrollHoursBreakdownDialog({
                     key={holiday.id}
                     className="flex items-center justify-between gap-2 text-sm text-[var(--color-muted-foreground)]"
                   >
-                    <span>{holiday.name}</span>
-                    <span className="shrink-0 tabular-nums">{formatHours(holiday.minutes)}</span>
+                    <span>
+                      {holiday.name}
+                      {holiday.workedMinutes > 0 && (
+                        <span className="block text-xs">
+                          Plus {formatHours(holiday.workedMinutes)} actually worked
+                        </span>
+                      )}
+                    </span>
+                    <span className="shrink-0 text-right tabular-nums">
+                      {formatHours(holiday.minutes)}
+                      <span className="block text-xs">paid holiday</span>
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -129,7 +139,8 @@ export function PayrollHoursBreakdownDialog({
                   <>
                     Overtime is {formatHours(overtimeMinutes)} — hours beyond the{' '}
                     {formatHours(thresholdMinutes)} regular cap ({settings.standard_hours_per_week}{' '}
-                    hrs/week × {payPeriodWeeksLabel(settings)}).
+                    hrs/week × {payPeriodWeeksLabel(settings)}). Paid holiday hours and actual
+                    worked holiday shifts use the same cap.
                   </>
                 ) : (
                   <>

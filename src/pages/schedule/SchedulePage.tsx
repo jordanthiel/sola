@@ -168,7 +168,7 @@ export function SchedulePage() {
       draft: {
         day,
         startsAt: setMinutes(setHours(day, 9), 0),
-        endsAt: setMinutes(setHours(day, 17), 0),
+        endsAt: setMinutes(setHours(day, 13), 0),
         holidayWorked: true,
       },
     })
