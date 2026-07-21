@@ -2,6 +2,8 @@
 
 Decision brief for replacing (or simplifying) Gusto Embedded with a household-native payments approach.
 
+> **Decision (implemented):** Free tier = Option A (mark as paid). Paid tier = Option C (NannyKeeper full payroll). See [HOUSEHOLD_PAYMENTS.md](./HOUSEHOLD_PAYMENTS.md).
+
 ## Current state (what we already own)
 
 Soola is already the source of truth for **gross pay**. Gusto is an optional, feature-gated layer (`gusto_payroll`) mounted on top.

@@ -1075,7 +1075,8 @@ export interface Database {
           household_id: string
           household_nanny_id: string
           pay_period_close_id: string
-          gusto_payroll_uuid: string | null
+          provider: string
+          external_payroll_id: string | null
           status: string
           company_debit_cents: number | null
           net_pay_cents: number | null
@@ -1090,6 +1091,67 @@ export interface Database {
         }
         Insert: never
         Update: never
+        Relationships: []
+      }
+      nk_employers: {
+        Row: {
+          id: string
+          household_id: string
+          employer_id: string
+          state: string
+          admin_email: string
+          first_name: string
+          last_name: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          household_id: string
+          employer_id: string
+          state: string
+          admin_email: string
+          first_name: string
+          last_name: string
+        }
+        Update: Partial<{
+          state: string
+          admin_email: string
+          first_name: string
+          last_name: string
+          updated_at: string
+        }>
+        Relationships: []
+      }
+      nk_employees: {
+        Row: {
+          id: string
+          household_nanny_id: string
+          household_id: string
+          employer_row_id: string
+          employee_id: string
+          email: string | null
+          portal_url: string | null
+          onboarding_status: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          household_nanny_id: string
+          household_id: string
+          employer_row_id: string
+          employee_id: string
+          email?: string | null
+          portal_url?: string | null
+          onboarding_status?: string
+        }
+        Update: Partial<{
+          email: string | null
+          portal_url: string | null
+          onboarding_status: string
+          updated_at: string
+        }>
         Relationships: []
       }
     }

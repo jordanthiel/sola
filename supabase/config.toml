@@ -39,8 +39,5 @@ enable_confirmations = false
 [functions.send-email]
 verify_jwt = false
 
-[functions.gusto-api]
-verify_jwt = false
-
-[functions.gusto-webhook]
+[functions.nannykeeper-api]
 verify_jwt = false

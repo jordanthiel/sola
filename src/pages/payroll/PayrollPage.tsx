@@ -68,8 +68,8 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
-import { GustoPayrollActions } from '@/components/payroll/GustoPayrollActions'
-import { GustoNannyPayrollSetup } from '@/components/payroll/GustoNannyPayrollSetup'
+import { MarkPeriodPaidCard } from '@/components/payroll/MarkPeriodPaidCard'
+import { NannyKeeperPayrollActions } from '@/components/payroll/NannyKeeperPayrollActions'
 
 export function PayrollPage() {
   const { user } = useAuth()
@@ -380,8 +380,6 @@ export function PayrollPage() {
         </p>
       )}
 
-      {isNanny && !isDeactivated && <GustoNannyPayrollSetup />}
-
       <Card>
         <CardContent className="flex flex-wrap gap-4 pt-6">
           {isParent && (
@@ -452,6 +450,7 @@ export function PayrollPage() {
               </CardTitle>
               <div className="flex flex-wrap gap-2">
                 {periodClose && <Badge>Closed</Badge>}
+                {periodClose?.paid_at && <Badge variant="success">Paid</Badge>}
                 <Badge variant="secondary">{hoursBasis}</Badge>
               </div>
             </CardHeader>
@@ -686,8 +685,21 @@ export function PayrollPage() {
             />
           )}
 
+          {isParent && periodClose && (
+            <MarkPeriodPaidCard
+              payPeriodCloseId={periodClose.id}
+              defaultAmountCents={
+                (periodClose.snapshot as PayrollSnapshot | null)?.netPayCents ??
+                displaySummary?.netPayCents ??
+                0
+              }
+              paidAt={periodClose.paid_at}
+              paidAmountCents={periodClose.paid_amount_cents}
+            />
+          )}
+
           {isParent && householdNannyId && period && (
-            <GustoPayrollActions
+            <NannyKeeperPayrollActions
               householdNannyId={householdNannyId}
               payPeriodCloseId={periodClose?.id}
               periodLabel={`${format(period.start, 'MMM d')} – ${format(period.end, 'MMM d, yyyy')}`}

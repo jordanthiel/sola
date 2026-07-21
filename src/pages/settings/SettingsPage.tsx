@@ -39,7 +39,7 @@ export function SettingsPage() {
   const { user, profile, refreshProfile } = useAuth()
   const { activeHousehold, isParent } = useHousehold()
   const { data: canManageGates } = useFeatureAccess(FEATURE_KEYS.featureGateAdmin)
-  const { data: hasGustoAccess } = useFeatureAccess(FEATURE_KEYS.gustoPayroll)
+  const { data: hasHouseholdPayroll } = useFeatureAccess(FEATURE_KEYS.householdPayroll)
   const startNannyPreview = useStartNannyPreview()
   const { data: nannies, refetch: refetchNannies } = useHouseholdNannies({ includeDeactivated: true })
   const qc = useQueryClient()
@@ -304,30 +304,31 @@ export function SettingsPage() {
 
           <HouseholdMembersCard />
 
-          {(hasGustoAccess || canManageGates) && (
+          {(hasHouseholdPayroll || canManageGates) && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Integrations</CardTitle>
                 <CardDescription>Payroll and third-party services</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                {hasGustoAccess && (
+                {hasHouseholdPayroll && (
                   <Link
-                    to="/settings/gusto"
+                    to="/settings/payroll"
                     className="flex items-center justify-between rounded-lg border px-4 py-3 transition-colors hover:bg-[var(--color-muted)]/40"
                   >
                     <div>
-                      <p className="font-medium">Gusto payroll</p>
+                      <p className="font-medium">Household payroll</p>
                       <p className="text-sm text-[var(--color-muted-foreground)]">
-                        Set up compliant payroll processing
+                        Paid tier: NannyKeeper taxes, runs, W-2, and Schedule H
                       </p>
                     </div>
                     <ChevronRight className="h-4 w-4 text-[var(--color-muted-foreground)]" />
                   </Link>
                 )}
-                {canManageGates && !hasGustoAccess && (
+                {canManageGates && !hasHouseholdPayroll && (
                   <p className="text-sm text-[var(--color-muted-foreground)]">
-                    Grant yourself Gusto access under Feature access below to test payroll integration.
+                    Grant yourself Household payroll access under Feature access below to test the
+                    NannyKeeper integration. Free-tier Mark as paid is always available on Earnings.
                   </p>
                 )}
               </CardContent>
