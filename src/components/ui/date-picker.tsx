@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { startOfMonth, subYears } from 'date-fns'
+import { addYears, startOfMonth, subYears } from 'date-fns'
 import type { DayPickerProps } from 'react-day-picker'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Calendar } from '@/components/ui/calendar'
@@ -56,7 +56,8 @@ export function DatePicker({
 
   const endMonth = useMemo(() => {
     if (maxDate) return startOfMonth(maxDate)
-    return startOfMonth(new Date())
+    // Allow future months when no max is set (e.g. PTO, schedule).
+    return startOfMonth(addYears(new Date(), 2))
   }, [max])
 
   const startMonth = useMemo(() => {
