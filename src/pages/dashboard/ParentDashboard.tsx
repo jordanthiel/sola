@@ -1,16 +1,18 @@
 import { useMemo } from 'react'
-import { addDays, endOfWeek, format, isAfter, parseISO, startOfDay, startOfWeek } from 'date-fns'
+import { addDays, endOfWeek, format, parseISO, startOfDay, startOfWeek } from 'date-fns'
 import { Link } from 'react-router-dom'
 import { Calendar, ChevronRight, Clock } from 'lucide-react'
 import { useHousehold } from '@/contexts/HouseholdContext'
 import {
   useChildActivities,
+  useEmploymentSettings,
   useMembers,
   useNannies,
   usePendingTimeOff,
   useScheduleBlocks,
   useScheduleTemplates,
 } from '@/hooks/useHouseholdData'
+import { useHouseholdHolidays } from '@/hooks/useHouseholdHolidays'
 import { nannyDisplayName } from '@/lib/nanny'
 import {
   blockHasLateReport,
@@ -20,7 +22,9 @@ import {
 import { isTemplateOccurrence, mergeScheduleWithTemplates } from '@/lib/schedule'
 import type { TemplateOccurrence } from '@/lib/schedule'
 import type { NannyScheduleTemplate } from '@/types/schedule-template'
-import type { ScheduleBlock } from '@/types/database'
+import { buildCalendarEvents } from '@/lib/calendar-events'
+import type { EmploymentSetting, ScheduleBlock } from '@/types/database'
+import { calculatePayroll, holidayPayItemsInPeriod } from '@/lib/payroll'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { useAuth } from '@/contexts/AuthContext'
 import { GettingStartedCard } from '@/components/dashboard/GettingStartedCard'
@@ -49,6 +53,17 @@ function shiftEndAt(item: ScheduleBlock | TemplateOccurrence): Date {
   return typeof end === 'string' ? parseISO(end) : end
 }
 
+function currentSettingsByNanny(settings: EmploymentSetting[] | undefined) {
+  const byId = new Map<string, EmploymentSetting>()
+  for (const setting of settings ?? []) {
+    if (!setting.household_nanny_id) continue
+    if (!byId.has(setting.household_nanny_id)) {
+      byId.set(setting.household_nanny_id, setting)
+    }
+  }
+  return byId
+}
+
 export function ParentDashboard() {
   const { activeHousehold } = useHousehold()
   const { user } = useAuth()
@@ -65,6 +80,8 @@ export function ParentDashboard() {
   const { data: nannies } = useNannies()
   const { data: members } = useMembers()
   const nannyIds = useMemo(() => nannies?.map((n) => n.id) ?? [], [nannies])
+  const { data: employmentSettings } = useEmploymentSettings()
+  const { data: holidayOverrides } = useHouseholdHolidays()
 
   const { data: upcomingBlocks } = useScheduleBlocks(scheduleFrom, scheduleTo)
   const { data: weekBlocks } = useScheduleBlocks(weekStart.toISOString(), weekQueryTo.toISOString())
@@ -75,6 +92,7 @@ export function ParentDashboard() {
   const weekMinutes = useMemo(() => {
     if (!weekBlocks || !nannyIds.length) return 0
     const tpl = (templates ?? []) as NannyScheduleTemplate[]
+    const settingsByNanny = currentSettingsByNanny(employmentSettings)
     return nannyIds.reduce((total, nannyId) => {
       const nanny = nannies?.find((n) => n.id === nannyId)
       const shifts = payableShiftsInPeriod(
@@ -85,9 +103,21 @@ export function ParentDashboard() {
         weekEnd,
         nanny?.start_date,
       )
-      return total + shifts.reduce((s, sh) => s + payableShiftMinutes(sh), 0)
+      const settings = settingsByNanny.get(nannyId)
+      if (!settings) {
+        return total + shifts.reduce((s, sh) => s + payableShiftMinutes(sh), 0)
+      }
+      return total + calculatePayroll(
+        shifts,
+        settings,
+        weekStart,
+        weekEnd,
+        [],
+        [],
+        holidayOverrides ?? [],
+      ).totalMinutes
     }, 0)
-  }, [weekBlocks, templates, nannyIds, weekStart, weekEnd, nannies])
+  }, [weekBlocks, templates, nannyIds, weekStart, weekEnd, nannies, employmentSettings, holidayOverrides])
 
   const mergedUpcoming = useMemo(() => {
     if (!upcomingBlocks || !nannyIds.length) return []
@@ -100,15 +130,50 @@ export function ParentDashboard() {
     )
   }, [upcomingBlocks, templates, nannyIds, today, upcomingEnd])
 
-  const myUpcoming = useMemo(() => {
-    const now = new Date()
-    return mergedUpcoming.filter((item) => isAfter(shiftStartAt(item), now)).slice(0, 5)
-  }, [mergedUpcoming])
-
   const nannyNameById = useMemo(
     () => Object.fromEntries((nannies ?? []).map((n) => [n.id, nannyDisplayName(n)])),
     [nannies],
   )
+
+  const upcomingScheduleEvents = useMemo(() => {
+    const now = new Date()
+    const nameFor = (householdNannyId: string | null) => {
+      if (!householdNannyId) return 'Nanny'
+      return nannyNameById[householdNannyId] ?? 'Nanny'
+    }
+    return buildCalendarEvents({
+      scheduleItems: mergedUpcoming,
+      timeOffRequests: [],
+      activities: [],
+      nannyName: nameFor,
+      holidayOverrides: holidayOverrides ?? [],
+      holidayRange: { from: today, to: upcomingEnd },
+    })
+      .filter((event) => (event.kind === 'shift' || event.kind === 'holiday') && event.endsAt >= now)
+      .slice(0, 5)
+  }, [mergedUpcoming, nannyNameById, holidayOverrides, today, upcomingEnd])
+
+  const holidayHoursByDate = useMemo(() => {
+    const byDate = new Map<string, number>()
+    const settingsByNanny = currentSettingsByNanny(employmentSettings)
+    const tpl = (templates ?? []) as NannyScheduleTemplate[]
+    for (const nanny of nannies ?? []) {
+      const settings = settingsByNanny.get(nanny.id)
+      if (!settings) continue
+      const shifts = payableShiftsInPeriod(
+        upcomingBlocks ?? [],
+        tpl,
+        nanny.id,
+        today,
+        upcomingEnd,
+        nanny.start_date,
+      )
+      for (const holiday of holidayPayItemsInPeriod(holidayOverrides ?? [], settings, shifts, today, upcomingEnd)) {
+        byDate.set(holiday.date, (byDate.get(holiday.date) ?? 0) + holiday.minutes)
+      }
+    }
+    return byDate
+  }, [employmentSettings, holidayOverrides, nannies, templates, upcomingBlocks, today, upcomingEnd])
 
   const groupedPlans = useMemo(() => {
     const enriched = enrichActivitiesWithAttendeeLabels(activities ?? [], {
@@ -170,20 +235,23 @@ export function ParentDashboard() {
           </Button>
         </CardHeader>
         <CardContent>
-          {!myUpcoming.length ? (
+          {!upcomingScheduleEvents.length ? (
             <p className="py-4 text-center text-sm text-[var(--color-muted-foreground)]">
-              No upcoming shifts in the next 14 days.
+              No upcoming shifts or paid holidays in the next 14 days.
             </p>
           ) : (
             <ul className="divide-y">
-              {myUpcoming.map((s) => {
-                const start = shiftStartAt(s)
-                const end = shiftEndAt(s)
-                const nannyId = s.household_nanny_id
-                const nannyLabel = nannyId ? nannyNameById[nannyId] : undefined
+              {upcomingScheduleEvents.map((event) => {
+                const scheduleItem = event.scheduleItem
+                const isShift = event.kind === 'shift' && scheduleItem
+                const start = isShift ? shiftStartAt(scheduleItem) : event.startsAt
+                const end = isShift ? shiftEndAt(scheduleItem) : event.endsAt
+                const nannyLabel = event.householdNannyId ? nannyNameById[event.householdNannyId] : undefined
+                const holidayDate = format(event.startsAt, 'yyyy-MM-dd')
+                const holidayMinutes = event.kind === 'holiday' ? holidayHoursByDate.get(holidayDate) : undefined
                 return (
                   <li
-                    key={s.id}
+                    key={event.id}
                     className="flex items-center justify-between py-3 first:pt-0 last:pb-0"
                   >
                     <div>
@@ -196,12 +264,21 @@ export function ParentDashboard() {
                         )}
                       </p>
                       <p className="text-sm text-[var(--color-muted-foreground)]">
-                        {format(start, 'h:mm a')} – {format(end, 'h:mm a')}
+                        {event.kind === 'holiday'
+                          ? `${event.title}${holidayMinutes ? ` · ${formatHours(holidayMinutes)} paid holiday` : ''}`
+                          : `${format(start, 'h:mm a')} – ${format(end, 'h:mm a')}`}
                       </p>
+                      {event.subtitle && event.kind !== 'holiday' && (
+                        <p className="text-xs text-[var(--color-muted-foreground)]">{event.subtitle}</p>
+                      )}
                     </div>
-                    {!isTemplateOccurrence(s) && blockHasLateReport(s) && (
-                      <Badge variant="warning">Late</Badge>
-                    )}
+                    <div className="flex flex-wrap justify-end gap-1.5">
+                      {event.kind === 'holiday' && <Badge variant="secondary">Paid holiday</Badge>}
+                      {event.holidayWorked && <Badge variant="secondary">Worked holiday</Badge>}
+                      {isShift && !isTemplateOccurrence(scheduleItem) && blockHasLateReport(scheduleItem) && (
+                        <Badge variant="warning">Late</Badge>
+                      )}
+                    </div>
                   </li>
                 )
               })}
