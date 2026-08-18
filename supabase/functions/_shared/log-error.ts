@@ -52,29 +52,10 @@ function safeJsonStringify(value: unknown): string {
   }
 }
 
-export function logGustoApiError(
-  context: string,
-  e: unknown,
-  meta?: Record<string, unknown>,
-): SerializedError {
-  const serialized = serializeError(e)
-  console.error(`gusto-api [${context}]`, {
-    ...meta,
-    error: serialized.message,
-    name: serialized.name,
-    code: serialized.code,
-    details: serialized.details,
-    hint: serialized.hint,
-    stack: serialized.stack,
-    raw: serialized.raw,
-  })
-  return serialized
-}
-
 export function httpStatusForError(message: string): number {
   if (message === 'Unauthorized') return 401
   if (message.startsWith('Forbidden')) return 403
+  if (message.includes('not available for your account')) return 403
   if (message.includes('not configured') || message.includes('required')) return 400
-  if (/ein.*already in use/i.test(message)) return 422
   return 500
 }

@@ -157,9 +157,12 @@ export function NannyDashboard() {
         }
       />
 
-      <NannyAdvanceDashboardCard householdNannyId={myNanny?.id} />
-
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <NannyAdvanceDashboardCard
+          householdNannyId={myNanny?.id}
+          className="md:col-span-2 lg:col-span-4"
+        />
+
         <Card className={cn('stat-card stat-card-highlight')}>
           <CardHeader className="pb-2">
             <CardDescription>This week</CardDescription>

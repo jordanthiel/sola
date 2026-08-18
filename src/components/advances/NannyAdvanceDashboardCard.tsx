@@ -25,9 +25,13 @@ import { cn } from '@/lib/utils'
 
 interface NannyAdvanceDashboardCardProps {
   householdNannyId: string | undefined
+  className?: string
 }
 
-export function NannyAdvanceDashboardCard({ householdNannyId }: NannyAdvanceDashboardCardProps) {
+export function NannyAdvanceDashboardCard({
+  householdNannyId,
+  className,
+}: NannyAdvanceDashboardCardProps) {
   const { data: myNanny } = useMyHouseholdNanny()
   const { data: advances } = usePaymentAdvances(householdNannyId)
   const { data: settingsList } = useEmploymentSettings(householdNannyId)
@@ -41,35 +45,51 @@ export function NannyAdvanceDashboardCard({ householdNannyId }: NannyAdvanceDash
       templates: (templates ?? []) as NannyScheduleTemplate[],
       householdNannyId,
       payStartDate: myNanny?.start_date,
+      platformStartDate: myNanny?.created_at?.slice(0, 10) ?? null,
     }
-  }, [householdNannyId, templates, myNanny?.start_date])
+  }, [householdNannyId, templates, myNanny?.start_date, myNanny?.created_at])
 
   const outstanding = useMemo(() => openAdvances(advances ?? []), [advances])
   const totalBalance = useMemo(() => totalAdvanceBalance(outstanding), [outstanding])
 
-  if (!outstanding.length || !settings) return null
+  if (!outstanding.length) return null
 
   return (
-    <Card className="border-l-4 border-l-amber-500">
+    <Card className={cn('stat-card stat-card-highlight border-l-4 border-l-amber-500', className)}>
       <CardHeader className="pb-2">
         <CardDescription className="flex items-center gap-1.5">
           <HandCoins className="h-3.5 w-3.5" />
           Payment advance
         </CardDescription>
-        <CardTitle className="text-2xl font-bold">{formatCurrency(totalBalance)} remaining</CardTitle>
+        <CardTitle className="text-3xl font-bold">{formatCurrency(totalBalance)} remaining</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {outstanding.length === 1 ? (
+        {outstanding.length === 1 && settings ? (
           <AdvanceDashboardSummary
             advance={outstanding[0]!}
             settings={settings}
             scheduleInput={scheduleInput}
             detailTo={`/payroll/advances/${outstanding[0]!.id}`}
           />
+        ) : outstanding.length === 1 ? (
+          <div className="space-y-3">
+            <p className="text-sm text-[var(--color-muted-foreground)]">
+              {formatCurrency(outstanding[0]!.amount_cents - outstanding[0]!.balance_cents)} repaid of{' '}
+              {formatCurrency(outstanding[0]!.amount_cents)}
+              {outstanding[0]!.reason ? ` · ${outstanding[0]!.reason}` : ''}
+            </p>
+            <Button variant="outline" size="sm" asChild>
+              <Link to={`/payroll/advances/${outstanding[0]!.id}`}>
+                View details <ChevronRight className="ml-1 h-3.5 w-3.5" />
+              </Link>
+            </Button>
+          </div>
         ) : (
           <ul className="divide-y rounded-lg border">
             {outstanding.map((advance) => {
-              const estimate = buildAdvancePayoffEstimate(advance, settings, scheduleInput)
+              const estimate = settings
+                ? buildAdvancePayoffEstimate(advance, settings, scheduleInput)
+                : null
               return (
                 <li key={advance.id}>
                   <Link
@@ -79,7 +99,8 @@ export function NannyAdvanceDashboardCard({ householdNannyId }: NannyAdvanceDash
                     <div className="min-w-0">
                       <p className="font-medium">{formatCurrency(advance.balance_cents)} left</p>
                       <p className="text-sm text-[var(--color-muted-foreground)]">
-                        {formatCurrency(estimate.paidCents)} repaid of {formatCurrency(advance.amount_cents)}
+                        {formatCurrency(estimate?.paidCents ?? advance.amount_cents - advance.balance_cents)} repaid of{' '}
+                        {formatCurrency(advance.amount_cents)}
                         {advance.reason ? ` · ${advance.reason}` : ''}
                       </p>
                     </div>
@@ -90,11 +111,13 @@ export function NannyAdvanceDashboardCard({ householdNannyId }: NannyAdvanceDash
             })}
           </ul>
         )}
-        <Button variant="link" className="h-auto px-0 py-0 text-xs" asChild>
-          <Link to={outstanding.length === 1 ? `/payroll/advances/${outstanding[0]!.id}` : '/payroll'}>
-            {outstanding.length === 1 ? 'View advance details' : 'Open earnings'} →
-          </Link>
-        </Button>
+        {!(outstanding.length === 1 && !settings) && (
+          <Button variant="link" className="h-auto px-0 py-0 text-xs" asChild>
+            <Link to={outstanding.length === 1 ? `/payroll/advances/${outstanding[0]!.id}` : '/payroll'}>
+              {outstanding.length === 1 ? 'View advance details' : 'Open earnings'} →
+            </Link>
+          </Button>
+        )}
       </CardContent>
     </Card>
   )

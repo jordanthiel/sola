@@ -21,7 +21,7 @@ import { TimeOffPage } from '@/pages/time-off/TimeOffPage'
 import { ChildrenPage } from '@/pages/children/ChildrenPage'
 import { ActivitiesPage } from '@/pages/activities/ActivitiesPage'
 import { SettingsPage } from '@/pages/settings/SettingsPage'
-import { GustoSettingsPage } from '@/pages/settings/GustoSettingsPage'
+import { HouseholdPayrollSettingsPage } from '@/pages/settings/HouseholdPayrollSettingsPage'
 import { NannyPage } from '@/pages/settings/NannyPage'
 import { DocumentsPage } from '@/pages/documents/DocumentsPage'
 import { FeedPage } from '@/pages/feed/FeedPage'
@@ -60,7 +60,7 @@ export default function App() {
                       <Route path="feed" element={<FeedPage />} />
                       <Route path="incidents" element={<IncidentsPage />} />
                       <Route path="settings" element={<SettingsPage />} />
-                      <Route path="settings/gusto" element={<GustoSettingsPage />} />
+                      <Route path="settings/payroll" element={<HouseholdPayrollSettingsPage />} />
                       <Route path="settings/nannies/:nannyId" element={<NannyPage />} />
                     </Route>
                   </Route>

@@ -12,7 +12,7 @@ A multi-household nanny management app for families. Parents manage schedules, p
 - Multi-household tenancy with role-based access (`owner`, `parent`, `nanny`)
 - Schedule planning (past and upcoming shifts)
 - Payroll preview: scheduled vs actual hours, bonuses, mileage, pay period close, pay stub PDF
-- **Gusto Embedded** (optional): compliant pay runs, withholding, and ACH after period close — see [docs/GUSTO_EMBEDDED.md](docs/GUSTO_EMBEDDED.md)
+- **Household payments:** free-tier mark-as-paid; paid-tier NannyKeeper payroll (taxes, runs, W-2, Schedule H, ACH) — see [docs/HOUSEHOLD_PAYMENTS.md](docs/HOUSEHOLD_PAYMENTS.md)
 - Payment advance tracking
 - Sick / PTO requests and balances
 - Children care sheets (allergies, meds, routines) and emergency contacts
@@ -85,17 +85,18 @@ npx supabase secrets set RESEND_API_KEY=re_xxxx EMAIL_FROM="Sova Home <hello@sov
 
 Invites send email when Resend is configured.
 
-### 5. Gusto Embedded payroll (optional)
+### 5. Household payroll / NannyKeeper (optional paid tier)
 
 ```bash
-# Credentials in supabase/functions/.env — see docs/GUSTO_EMBEDDED.md
-npx supabase functions serve gusto-api gusto-webhook
+# Credentials in supabase/functions/.env — see docs/HOUSEHOLD_PAYMENTS.md
+npx supabase functions serve nannykeeper-api
 # Hosted:
-npx supabase functions deploy gusto-api gusto-webhook
-npx supabase secrets set GUSTO_CLIENT_ID=xxx GUSTO_CLIENT_SECRET=xxx GUSTO_ENV=demo
+npx supabase functions deploy nannykeeper-api
+npx supabase secrets set NANNYKEEPER_API_KEY=nk_live_xxx
 ```
 
-Parents enable payroll under **Settings → Gusto payroll**, complete Gusto onboarding, then submit closed pay periods from the **Payroll** page.
+Free tier: after finalizing a pay period on **Earnings**, use **Mark as paid**.  
+Paid tier: grant the `household_payroll` feature gate, set up under **Settings → Household payroll**, then preview/run from **Earnings**.
 
 ### 6. Start the app
 

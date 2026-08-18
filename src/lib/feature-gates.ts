@@ -1,6 +1,6 @@
 export const FEATURE_KEYS = {
   featureGateAdmin: 'feature_gate_admin',
-  gustoPayroll: 'gusto_payroll',
+  householdPayroll: 'household_payroll',
 } as const
 
 export type FeatureKey = (typeof FEATURE_KEYS)[keyof typeof FEATURE_KEYS]

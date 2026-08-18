@@ -253,6 +253,9 @@ export interface Database {
           pay_reporting_mode: PayReportingMode
           over_table_percent: number
           auto_record_advance_repayments: boolean
+          auto_finalize_pay_periods: boolean
+          auto_finalize_grace_days: number
+          payroll_hours_basis: 'scheduled' | 'actual'
           overnight_rate_cents: number | null
           overnight_start_time: string
           overnight_end_time: string
@@ -275,6 +278,9 @@ export interface Database {
           pay_reporting_mode?: PayReportingMode
           over_table_percent?: number
           auto_record_advance_repayments?: boolean
+          auto_finalize_pay_periods?: boolean
+          auto_finalize_grace_days?: number
+          payroll_hours_basis?: 'scheduled' | 'actual'
           overnight_rate_cents?: number | null
           overnight_start_time?: string
           overnight_end_time?: string
@@ -297,6 +303,9 @@ export interface Database {
           pay_reporting_mode?: PayReportingMode
           over_table_percent?: number
           auto_record_advance_repayments?: boolean
+          auto_finalize_pay_periods?: boolean
+          auto_finalize_grace_days?: number
+          payroll_hours_basis?: 'scheduled' | 'actual'
           overnight_rate_cents?: number | null
           overnight_start_time?: string
           overnight_end_time?: string
@@ -1075,7 +1084,8 @@ export interface Database {
           household_id: string
           household_nanny_id: string
           pay_period_close_id: string
-          gusto_payroll_uuid: string | null
+          provider: string
+          external_payroll_id: string | null
           status: string
           company_debit_cents: number | null
           net_pay_cents: number | null
@@ -1090,6 +1100,67 @@ export interface Database {
         }
         Insert: never
         Update: never
+        Relationships: []
+      }
+      nk_employers: {
+        Row: {
+          id: string
+          household_id: string
+          employer_id: string
+          state: string
+          admin_email: string
+          first_name: string
+          last_name: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          household_id: string
+          employer_id: string
+          state: string
+          admin_email: string
+          first_name: string
+          last_name: string
+        }
+        Update: Partial<{
+          state: string
+          admin_email: string
+          first_name: string
+          last_name: string
+          updated_at: string
+        }>
+        Relationships: []
+      }
+      nk_employees: {
+        Row: {
+          id: string
+          household_nanny_id: string
+          household_id: string
+          employer_row_id: string
+          employee_id: string
+          email: string | null
+          portal_url: string | null
+          onboarding_status: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          household_nanny_id: string
+          household_id: string
+          employer_row_id: string
+          employee_id: string
+          email?: string | null
+          portal_url?: string | null
+          onboarding_status?: string
+        }
+        Update: Partial<{
+          email: string | null
+          portal_url: string | null
+          onboarding_status: string
+          updated_at: string
+        }>
         Relationships: []
       }
     }
@@ -1211,6 +1282,18 @@ export interface Database {
           p_household_id: string
           p_period_start: string
           p_repayments: { advance_id: string; amount_cents: number }[]
+        }
+        Returns: number
+      }
+      auto_finalize_pay_period: {
+        Args: {
+          p_household_id: string
+          p_household_nanny_id: string
+          p_period_start: string
+          p_period_end: string
+          p_hours_basis: 'scheduled' | 'actual'
+          p_snapshot: Json
+          p_repayments?: { advance_id: string; amount_cents: number }[]
         }
         Returns: number
       }
