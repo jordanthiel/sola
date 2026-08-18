@@ -18,7 +18,7 @@ import {
   suggestPerPaycheckBackfill,
   type PayPeriodOption,
 } from '@/lib/advance-backfill'
-import { repaymentModeLabel } from '@/lib/advances'
+import { dedupeAdvanceRepayments, repaymentModeLabel, repaymentPeriodLabel } from '@/lib/advances'
 import { formatSupabaseError } from '@/lib/errors'
 import { invalidateAdvanceQueries } from '@/lib/invalidate-advances'
 import type { AdvanceRepaymentMode } from '@/types/database'
@@ -467,7 +467,7 @@ export function PaymentAdvancesCard({
         <ul className="space-y-3 border-t pt-4">
           {advances?.map((a) => {
             const paid = a.amount_cents - a.balance_cents
-            const history = repaymentsByAdvance[a.id] ?? []
+            const history = dedupeAdvanceRepayments(repaymentsByAdvance[a.id] ?? [])
             const expanded = expandedAdvanceId === a.id
 
             return (
@@ -509,10 +509,16 @@ export function PaymentAdvancesCard({
                 </div>
                 {expanded && history.length > 0 && (
                   <ul className="mt-3 space-y-1 border-t pt-2 text-sm">
-                    {history.map((r) => (
+                    {[...history]
+                      .sort((a, b) => {
+                        const aKey = a.pay_period_start ?? a.paid_on
+                        const bKey = b.pay_period_start ?? b.paid_on
+                        return bKey.localeCompare(aKey) || b.paid_on.localeCompare(a.paid_on)
+                      })
+                      .map((r) => (
                       <li key={r.id} className="flex justify-between gap-2">
                         <span>
-                          {r.paid_on} · {repaymentSourceLabel(r.source)}
+                          {repaymentPeriodLabel(r, settings?.pay_period)} · {repaymentSourceLabel(r.source)}
                           {r.notes && ` · ${r.notes}`}
                         </span>
                         <span className="font-medium">{formatCurrency(r.amount_cents)}</span>

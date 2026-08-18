@@ -45,16 +45,13 @@ export function CalendarEventView({
   const isHoliday = event.kind === 'holiday'
 
   const canEditShift = isParent && event.kind === 'shift'
-  const canEditTimeOff =
-    event.kind === 'time_off' && (isParent || (isNanny && event.timeOffStatus === 'pending'))
+  const canEditTimeOff = event.kind === 'time_off' && (isParent || isNanny)
   const canEditActivity = event.kind === 'activity'
   const canEdit = canEditShift || canEditTimeOff || canEditActivity
 
   const canDelete =
     (event.kind === 'shift' && event.sourceId && !event.isTemplate) ||
-    (event.kind === 'time_off' &&
-      event.sourceId &&
-      (isParent || event.timeOffStatus === 'pending')) ||
+    (event.kind === 'time_off' && event.sourceId && (isParent || isNanny)) ||
     (event.kind === 'activity' && event.sourceId)
 
   async function handleDelete() {

@@ -4,46 +4,82 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useHousehold } from '@/contexts/HouseholdContext'
 import { useMyHouseholdNanny } from '@/hooks/useHouseholdData'
-import { invalidateTimeOffQueries } from '@/lib/invalidate-time-off'
+import { useHouseholdHolidays } from '@/hooks/useHouseholdHolidays'
+import { invalidateCalendarQueries } from '@/lib/invalidate-calendar'
 import { Button } from '@/components/ui/button'
+import { TimeOffHoursFields } from '@/components/time-off/TimeOffHoursFields'
 import { DatePicker } from '@/components/ui/date-picker'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  DEFAULT_PTO_HOURS_PER_DAY,
+  calculatedTimeOffHours,
+  hoursPerDayFromTotal,
+  parseHoursPerDay,
+} from '@/lib/pto'
 import { selectCn } from '@/lib/utils'
-import type { TimeOffType } from '@/types/database'
+import type { TimeOffRequest, TimeOffType } from '@/types/database'
 
-export function RequestTimeOffForm({ onSuccess }: { onSuccess?: () => void }) {
+export function RequestTimeOffForm({
+  onSuccess,
+  existing,
+}: {
+  onSuccess?: () => void
+  existing?: TimeOffRequest
+}) {
   const { activeHousehold } = useHousehold()
   const { data: myNanny } = useMyHouseholdNanny()
+  const { data: holidayOverrides } = useHouseholdHolidays()
   const qc = useQueryClient()
+  const isEdit = !!existing
+  const holidays = holidayOverrides ?? []
 
-  const [type, setType] = useState<TimeOffType>('sick')
-  const [startsOn, setStartsOn] = useState('')
-  const [endsOn, setEndsOn] = useState('')
-  const [hours, setHours] = useState('8')
-  const [notes, setNotes] = useState('')
+  const [type, setType] = useState<TimeOffType>(existing?.type ?? 'sick')
+  const [startsOn, setStartsOn] = useState(existing?.starts_on ?? '')
+  const [endsOn, setEndsOn] = useState(existing?.ends_on ?? '')
+  const [hoursPerDay, setHoursPerDay] = useState(
+    existing
+      ? hoursPerDayFromTotal(existing.hours, existing.starts_on, existing.ends_on, holidays)
+      : String(DEFAULT_PTO_HOURS_PER_DAY),
+  )
+  const [notes, setNotes] = useState(existing?.notes ?? '')
 
-  const createRequest = useMutation({
+  const parsedHoursPerDay = parseHoursPerDay(hoursPerDay)
+  const totalHours =
+    parsedHoursPerDay == null
+      ? 0
+      : calculatedTimeOffHours(startsOn, endsOn, parsedHoursPerDay, holidays)
+
+  const saveRequest = useMutation({
     mutationFn: async () => {
       if (!myNanny) throw new Error('Your profile is not linked yet')
-      const { error } = await supabase.from('time_off_requests').insert({
-        household_id: activeHousehold!.id,
-        household_nanny_id: myNanny.id,
+      if (totalHours <= 0) throw new Error('Choose a date range with at least one working day')
+      const payload = {
         type,
         starts_on: startsOn,
         ends_on: endsOn,
-        hours: parseFloat(hours),
-        notes: notes || null,
+        hours: totalHours,
+        notes: notes.trim() || null,
+      }
+      if (existing) {
+        const { error } = await supabase.from('time_off_requests').update(payload).eq('id', existing.id)
+        if (error) throw error
+        return
+      }
+      const { error } = await supabase.from('time_off_requests').insert({
+        household_id: activeHousehold!.id,
+        household_nanny_id: myNanny.id,
+        ...payload,
       })
       if (error) throw error
     },
     onSuccess: () => {
-      void invalidateTimeOffQueries(qc)
+      void invalidateCalendarQueries(qc)
       setNotes('')
-      toast.success('Time off request submitted')
+      toast.success(isEdit ? 'Time off request updated' : 'Time off request submitted')
       onSuccess?.()
     },
-    onError: () => toast.error('Failed to submit request'),
+    onError: () => toast.error(isEdit ? 'Failed to update request' : 'Failed to submit request'),
   })
 
   if (!myNanny?.user_id) {
@@ -66,6 +102,9 @@ export function RequestTimeOffForm({ onSuccess }: { onSuccess?: () => void }) {
           <option value="sick">Sick</option>
           <option value="pto">PTO</option>
           <option value="unpaid">Unpaid</option>
+          {(existing?.type === 'vacation' || type === 'vacation') && (
+            <option value="vacation">Vacation</option>
+          )}
         </select>
       </div>
       <div className="grid gap-4 md:grid-cols-3">
@@ -77,20 +116,29 @@ export function RequestTimeOffForm({ onSuccess }: { onSuccess?: () => void }) {
           <Label>End date</Label>
           <DatePicker value={endsOn} onChange={setEndsOn} min={startsOn || undefined} />
         </div>
-        <div className="space-y-2">
-          <Label>Hours</Label>
-          <Input type="number" value={hours} onChange={(e) => setHours(e.target.value)} />
-        </div>
+        <TimeOffHoursFields
+          startsOn={startsOn}
+          endsOn={endsOn}
+          hoursPerDay={hoursPerDay}
+          onHoursPerDayChange={setHoursPerDay}
+          holidayOverrides={holidays}
+        />
       </div>
       <div className="space-y-2">
         <Label>Notes</Label>
         <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
       </div>
       <Button
-        onClick={() => createRequest.mutate()}
-        disabled={!startsOn || !endsOn || createRequest.isPending}
+        onClick={() => saveRequest.mutate()}
+        disabled={!startsOn || !endsOn || totalHours <= 0 || saveRequest.isPending}
       >
-        {createRequest.isPending ? 'Submitting...' : 'Submit request'}
+        {saveRequest.isPending
+          ? isEdit
+            ? 'Saving...'
+            : 'Submitting...'
+          : isEdit
+            ? 'Save changes'
+            : 'Submit request'}
       </Button>
     </div>
   )

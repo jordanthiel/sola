@@ -1,6 +1,9 @@
 import { useMemo, useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import { Plus } from 'lucide-react'
+import { toast } from 'sonner'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { supabase } from '@/lib/supabase'
 import { useHousehold } from '@/contexts/HouseholdContext'
 import {
   useMyHouseholdNanny,
@@ -9,6 +12,8 @@ import {
   useTimeOffRequests,
 } from '@/hooks/useHouseholdData'
 import { nannyDisplayName } from '@/lib/nanny'
+import { formatSupabaseError } from '@/lib/errors'
+import { invalidateCalendarQueries } from '@/lib/invalidate-calendar'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -26,6 +31,7 @@ import { PendingTimeOffApprovals } from '@/components/time-off/PendingTimeOffApp
 import { RequestTimeOffForm } from '@/components/time-off/RequestTimeOffForm'
 import { timeOffTypeLabel } from '@/components/time-off/time-off-labels'
 import { TimeOffReviewNotesDisplay } from '@/components/time-off/time-off-notes'
+import type { TimeOffRequest } from '@/types/database'
 
 export function TimeOffPage() {
   const { isParent } = useHousehold()
@@ -33,7 +39,8 @@ export function TimeOffPage() {
   const { data: requests, isLoading } = useTimeOffRequests()
   const { data: balances } = usePtoBalances()
   const { data: nannies } = useNannies()
-  const [addOpen, setAddOpen] = useState(false)
+  const qc = useQueryClient()
+  const [dialog, setDialog] = useState<'add' | TimeOffRequest | null>(null)
 
   const nannyName = (householdNannyId: string | null) => {
     if (!householdNannyId) return 'Nanny'
@@ -47,6 +54,30 @@ export function TimeOffPage() {
   )
 
   const myBalance = balances?.find((b) => b.household_nanny_id === myNanny?.id)
+  const editing = dialog && dialog !== 'add' ? dialog : undefined
+
+  const deleteRequest = useMutation({
+    mutationFn: async (r: TimeOffRequest) => {
+      const { error } = await supabase.from('time_off_requests').delete().eq('id', r.id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      void invalidateCalendarQueries(qc)
+      toast.success('Time off deleted')
+    },
+    onError: (err) => toast.error(formatSupabaseError(err)),
+  })
+
+  function confirmDelete(r: TimeOffRequest) {
+    const balanceNote =
+      r.status === 'approved' && (r.type === 'sick' || r.type === 'pto')
+        ? isParent
+          ? ' Hours will be returned to their balance.'
+          : ' Hours will be returned to your balance.'
+        : ''
+    if (!confirm(`Delete this ${timeOffTypeLabel(r.type)} time off?${balanceNote}`)) return
+    deleteRequest.mutate(r)
+  }
 
   return (
     <div className="space-y-6">
@@ -89,7 +120,7 @@ export function TimeOffPage() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
           <CardTitle className="text-lg">Time off</CardTitle>
-          <Button size="sm" variant="outline" onClick={() => setAddOpen(true)}>
+          <Button size="sm" variant="outline" onClick={() => setDialog('add')}>
             <Plus className="mr-1 size-4" />
             Add
           </Button>
@@ -130,17 +161,33 @@ export function TimeOffPage() {
                     )}
                     <TimeOffReviewNotesDisplay notes={r.review_notes} />
                   </div>
-                  <Badge
-                    variant={
-                      r.status === 'approved'
-                        ? 'success'
-                        : r.status === 'denied'
-                          ? 'destructive'
-                          : 'warning'
-                    }
-                  >
-                    {r.status}
-                  </Badge>
+                  <div className="flex flex-col items-end gap-2">
+                    <Badge
+                      variant={
+                        r.status === 'approved'
+                          ? 'success'
+                          : r.status === 'denied'
+                            ? 'destructive'
+                            : 'warning'
+                      }
+                    >
+                      {r.status}
+                    </Badge>
+                    <div className="flex gap-1">
+                      <Button size="sm" variant="ghost" onClick={() => setDialog(r)}>
+                        Edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-red-600 hover:text-red-700"
+                        disabled={deleteRequest.isPending}
+                        onClick={() => confirmDelete(r)}
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -148,20 +195,36 @@ export function TimeOffPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+      <Dialog open={dialog !== null} onOpenChange={(open) => !open && setDialog(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{isParent ? 'Log time off' : 'Request time off'}</DialogTitle>
+            <DialogTitle>
+              {editing
+                ? 'Edit time off'
+                : isParent
+                  ? 'Log time off'
+                  : 'Request time off'}
+            </DialogTitle>
             <DialogDescription>
-              {isParent
-                ? 'Record sick or PTO for a nanny. It will be saved as approved.'
-                : 'Submit a time off request for your household to review.'}
+              {editing
+                ? 'Change dates, hours, or type. Approved sick and PTO hours update the balance.'
+                : isParent
+                  ? 'Record sick or PTO for a nanny. It will be saved as approved.'
+                  : 'Submit a time off request for your household to review.'}
             </DialogDescription>
           </DialogHeader>
           {isParent ? (
-            <LogTimeOffForm onSuccess={() => setAddOpen(false)} />
+            <LogTimeOffForm
+              key={editing?.id ?? 'new'}
+              existing={editing}
+              onSuccess={() => setDialog(null)}
+            />
           ) : (
-            <RequestTimeOffForm onSuccess={() => setAddOpen(false)} />
+            <RequestTimeOffForm
+              key={editing?.id ?? 'new'}
+              existing={editing}
+              onSuccess={() => setDialog(null)}
+            />
           )}
         </DialogContent>
       </Dialog>

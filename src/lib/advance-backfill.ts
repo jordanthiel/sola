@@ -20,12 +20,24 @@ export interface PrePlatformPeriodOptions {
   platformStartDate?: string | null
 }
 
-/** Date the household started tracking this nanny's payroll in the app. */
+/** Date in-app payroll starts: later of employment start and when the nanny was added. */
 export function platformPayrollStartDate(
   payStartDate?: string | null,
   platformCreatedAt?: string | null,
 ): string | null {
-  return platformCreatedAt?.slice(0, 10) || payStartDate || null
+  const employment = payStartDate?.slice(0, 10) || null
+  const platform = platformCreatedAt?.slice(0, 10) || null
+  if (employment && platform) return employment > platform ? employment : platform
+  return platform || employment
+}
+
+export function periodEndsBeforePayrollTracking(
+  periodEnd: Date | string,
+  trackingStart?: string | null,
+): boolean {
+  if (!trackingStart) return false
+  const end = typeof periodEnd === 'string' ? periodEnd : format(periodEnd, 'yyyy-MM-dd')
+  return end < trackingStart
 }
 
 export function completedPayPeriods(

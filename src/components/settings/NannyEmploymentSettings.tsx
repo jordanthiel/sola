@@ -291,7 +291,9 @@ export function NannyEmploymentSettings({ nanny }: { nanny: HouseholdNanny }) {
           <Label htmlFor="start-date">Employment start date</Label>
           <DatePicker id="start-date" value={startDate} onChange={setStartDate} />
           <p className="text-xs text-[var(--color-muted-foreground)]">
-            Scheduled hours before this date are not counted toward pay.
+            Scheduled hours before this date are not counted toward pay. Earnings also
+            start from when this nanny was added to the household — earlier periods are
+            not shown.
           </p>
         </div>
         <div className="space-y-2">

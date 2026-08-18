@@ -157,7 +157,11 @@ export function AdvanceDetailPage() {
           <CardTitle className="text-lg">Repayment history</CardTitle>
         </CardHeader>
         <CardContent>
-          <AdvanceRepaymentHistory repayments={advanceRepayments} issuedOn={advance.issued_on} />
+          <AdvanceRepaymentHistory
+            repayments={advanceRepayments}
+            issuedOn={advance.issued_on}
+            payPeriod={settings?.pay_period}
+          />
         </CardContent>
       </Card>
 

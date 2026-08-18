@@ -5,6 +5,7 @@ import {
   repaymentsForPayPeriod,
 } from '@/lib/advances'
 import { dueAutoFinalizePeriods } from '@/lib/auto-finalize'
+import { platformPayrollStartDate } from '@/lib/advance-backfill'
 import { nannyDisplayName } from '@/lib/nanny'
 import {
   getPayReportingFromSettings,
@@ -127,16 +128,17 @@ async function closeDuePeriod(input: {
   const blocks = (blocksRes.data ?? []) as ScheduleBlock[]
   const templates = (templatesRes.data ?? []) as NannyScheduleTemplate[]
   const timeEntries = (timeEntriesRes.data ?? []) as TimeEntry[]
+  const trackingStart = platformPayrollStartDate(nanny.start_date, nanny.created_at)
   const scheduledShifts = payableShiftsInPeriod(
     blocks,
     templates,
     nanny.id,
     periodStart,
     periodEnd,
-    nanny.start_date,
+    trackingStart,
   )
   const actualShifts = timeEntries.length
-    ? filterPayableShiftsByStartDate(timeEntriesToPayableShifts(timeEntries, blocks), nanny.start_date)
+    ? filterPayableShiftsByStartDate(timeEntriesToPayableShifts(timeEntries, blocks), trackingStart)
     : scheduledShifts
   const shifts = hoursBasis === 'actual' ? actualShifts : scheduledShifts
 
@@ -212,8 +214,9 @@ export async function runDueAutoFinalizations(input: {
     if (!settings?.auto_finalize_pay_periods) continue
 
     const due = dueAutoFinalizePeriods(settings.pay_period, settings.auto_finalize_grace_days)
+    const trackingStart = platformPayrollStartDate(nanny.start_date, nanny.created_at)
     for (const period of due) {
-      if (format(period.end, 'yyyy-MM-dd') < nanny.start_date) continue
+      if (trackingStart && format(period.end, 'yyyy-MM-dd') < trackingStart) continue
       const key = `${nanny.id}:${format(period.start, 'yyyy-MM-dd')}`
       if (closedKeys.has(key)) continue
       const didClose = await closeDuePeriod({
