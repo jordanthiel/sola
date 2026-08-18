@@ -144,7 +144,10 @@ export function NannyKeeperPayrollActions({
 
         {employer && !linkedEmployee && (
           <div className="space-y-3 rounded-lg border p-4">
-            <p className="text-sm">Link this nanny as a NannyKeeper employee (SSN/bank completed in their portal).</p>
+            <p className="text-sm">
+              Link this nanny as a NannyKeeper employee. Uses their start date, hourly rate, and pay
+              period from employment settings; SSN/bank are completed in their portal.
+            </p>
             <div className="flex flex-wrap items-end gap-3">
               <div className="space-y-2">
                 <Label htmlFor="nk-employee-email">Nanny email</Label>

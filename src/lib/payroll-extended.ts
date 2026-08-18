@@ -76,6 +76,7 @@ export function calculateExtendedPayroll(
   lineItems: PayrollLineItem[],
   vacationRequests: TimeOffRequest[] = [],
   holidayOverrides: Pick<HouseholdHoliday, 'holiday_key' | 'enabled'>[] = [],
+  recordedRepaymentsByAdvanceId: Record<string, number> = {},
 ): ExtendedPayrollSummary {
   const base = calculatePayroll(
     shifts,
@@ -85,6 +86,7 @@ export function calculateExtendedPayroll(
     advances,
     vacationRequests,
     holidayOverrides,
+    recordedRepaymentsByAdvanceId,
   )
   const lineTotal = lineItemsTotalCents(lineItems)
   const reporting = splitPayByReporting(

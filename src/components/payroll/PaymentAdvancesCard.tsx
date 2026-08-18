@@ -39,12 +39,14 @@ import { Badge } from '@/components/ui/badge'
 interface PaymentAdvancesCardProps {
   householdNannyId: string | undefined
   payStartDate?: string | null
+  platformStartDate?: string | null
   templates: NannyScheduleTemplate[] | undefined
 }
 
 export function PaymentAdvancesCard({
   householdNannyId,
   payStartDate,
+  platformStartDate,
   templates,
 }: PaymentAdvancesCardProps) {
   const { activeHousehold } = useHousehold()
@@ -85,8 +87,9 @@ export function PaymentAdvancesCard({
       templates: scheduleTemplates,
       householdNannyId,
       payStartDate,
+      platformStartDate: platformStartDate?.slice(0, 10) ?? null,
     }
-  }, [backfillBlocks, scheduleTemplates, householdNannyId, payStartDate])
+  }, [backfillBlocks, scheduleTemplates, householdNannyId, payStartDate, platformStartDate])
 
   const amountCents = Math.round(parseFloat(advanceAmount || '0') * 100)
   const perPaycheckCents =
@@ -116,8 +119,17 @@ export function PaymentAdvancesCard({
 
   const perPaycheckSuggestion = useMemo(() => {
     if (!pastIssued || !settings || !amountCents || !perPaycheckCents) return null
-    return suggestPerPaycheckBackfill(advanceIssuedOn, perPaycheckCents, amountCents, settings.pay_period)
-  }, [pastIssued, settings, amountCents, advanceIssuedOn, perPaycheckCents])
+    return suggestPerPaycheckBackfill(
+      advanceIssuedOn,
+      perPaycheckCents,
+      amountCents,
+      settings.pay_period,
+      {
+        payStartDate,
+        platformStartDate: platformStartDate?.slice(0, 10) ?? null,
+      },
+    )
+  }, [pastIssued, settings, amountCents, advanceIssuedOn, perPaycheckCents, payStartDate, platformStartDate])
 
   const overtimeSuggestion = useMemo(() => {
     if (!pastIssued || !settings || !amountCents || !scheduleInput) return null
@@ -354,13 +366,15 @@ export function PaymentAdvancesCard({
                     {overtimeSuggestion ? (
                       <>
                         Estimated from the usual weekly schedule across {overtimeSuggestion.periodCount}{' '}
-                        completed pay period{overtimeSuggestion.periodCount === 1 ? '' : 's'} (
+                        completed pay period{overtimeSuggestion.periodCount === 1 ? '' : 's'} before
+                        payroll tracking in this app (
                         {formatHours(overtimeSuggestion.totalOvertimeMinutes)} OT):{' '}
                       </>
                     ) : (
                       <>
                         Estimated from {suggestion.periodCount} completed pay period
-                        {suggestion.periodCount === 1 ? '' : 's'} and your repayment settings:{' '}
+                        {suggestion.periodCount === 1 ? '' : 's'} before payroll tracking in this
+                        app:{' '}
                       </>
                     )}
                     <strong>{formatCurrency(suggestion.suggestedCents)}</strong>
@@ -371,7 +385,7 @@ export function PaymentAdvancesCard({
                     {!usualScheduleReady
                       ? 'Set the default weekly schedule in Settings first so we can estimate overtime from usual hours.'
                       : overtimeSuggestion.totalOvertimeMinutes === 0
-                        ? `Based on the usual weekly schedule, no overtime hours fall in the past ${overtimeSuggestion.periodCount} pay period${overtimeSuggestion.periodCount === 1 ? '' : 's'} (hours are at or below the regular-time threshold). Enter repayments manually if some were made another way.`
+                        ? `Based on the usual weekly schedule, no overtime hours fall in the ${overtimeSuggestion.periodCount} pay period${overtimeSuggestion.periodCount === 1 ? '' : 's'} before payroll tracking in this app. Enter repayments manually if some were made another way.`
                         : 'Enter repayments manually below if payments were already made.'}
                   </p>
                 )}
@@ -384,6 +398,12 @@ export function PaymentAdvancesCard({
                   />
                   Select by pay period
                 </label>
+                {backfillByPeriod && periodOptions.length === 0 && (
+                  <p className="ml-4 text-sm text-[var(--color-muted-foreground)]">
+                    No completed pay periods before payroll tracking started in this app. Enter a
+                    total below if repayments were already made.
+                  </p>
+                )}
                 {backfillByPeriod && periodOptions.length > 0 && (
                   <ul className="ml-4 max-h-48 space-y-2 overflow-y-auto text-sm">
                     {periodOptions.map((p) => {

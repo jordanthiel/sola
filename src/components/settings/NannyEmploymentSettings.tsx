@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { selectCn } from '@/lib/utils'
 import { payReportingModeLabel } from '@/lib/pay-reporting'
+import { clampAutoFinalizeGraceDays } from '@/lib/auto-finalize'
 import type { PayPeriodType, PayReportingMode } from '@/types/database'
 import type { HouseholdNanny } from '@/types/household-nanny'
 
@@ -31,6 +32,9 @@ export function NannyEmploymentSettings({ nanny }: { nanny: HouseholdNanny }) {
   const [payReportingMode, setPayReportingMode] = useState<PayReportingMode>('all_over')
   const [overTablePercent, setOverTablePercent] = useState('100')
   const [autoRecordAdvanceRepayments, setAutoRecordAdvanceRepayments] = useState(false)
+  const [autoFinalizePayPeriods, setAutoFinalizePayPeriods] = useState(false)
+  const [autoFinalizeGraceDays, setAutoFinalizeGraceDays] = useState('2')
+  const [payrollHoursBasis, setPayrollHoursBasis] = useState<'scheduled' | 'actual'>('scheduled')
   const [overnightRate, setOvernightRate] = useState('')
   const [overnightStartTime, setOvernightStartTime] = useState('22:00')
   const [overnightEndTime, setOvernightEndTime] = useState('06:00')
@@ -54,6 +58,9 @@ export function NannyEmploymentSettings({ nanny }: { nanny: HouseholdNanny }) {
     setPayReportingMode(current.pay_reporting_mode ?? 'all_over')
     setOverTablePercent(String(current.over_table_percent ?? 100))
     setAutoRecordAdvanceRepayments(current.auto_record_advance_repayments ?? false)
+    setAutoFinalizePayPeriods(current.auto_finalize_pay_periods ?? false)
+    setAutoFinalizeGraceDays(String(current.auto_finalize_grace_days ?? 2))
+    setPayrollHoursBasis(current.payroll_hours_basis ?? 'scheduled')
     setOvernightRate(
       current.overnight_rate_cents == null ? '' : (current.overnight_rate_cents / 100).toFixed(2),
     )
@@ -75,6 +82,9 @@ export function NannyEmploymentSettings({ nanny }: { nanny: HouseholdNanny }) {
     current?.pay_reporting_mode,
     current?.over_table_percent,
     current?.auto_record_advance_repayments,
+    current?.auto_finalize_pay_periods,
+    current?.auto_finalize_grace_days,
+    current?.payroll_hours_basis,
     current?.overnight_rate_cents,
     current?.overnight_start_time,
     current?.overnight_end_time,
@@ -113,12 +123,18 @@ export function NannyEmploymentSettings({ nanny }: { nanny: HouseholdNanny }) {
       payReportingMode !== (current.pay_reporting_mode ?? 'all_over') ||
       overTable !== (current.over_table_percent ?? 100) ||
       autoRecordAdvanceRepayments !== (current.auto_record_advance_repayments ?? false) ||
+      autoFinalizePayPeriods !== (current.auto_finalize_pay_periods ?? false) ||
+      clampAutoFinalizeGraceDays(parseFloat(autoFinalizeGraceDays)) !==
+        (current.auto_finalize_grace_days ?? 2) ||
+      payrollHoursBasis !== (current.payroll_hours_basis ?? 'scheduled') ||
       normalizedOvernightCents !== current.overnight_rate_cents ||
       overnightStartTime !== (current.overnight_start_time ?? '22:00').slice(0, 5) ||
       overnightEndTime !== (current.overnight_end_time ?? '06:00').slice(0, 5) ||
       normalizedVacationCents !== current.vacation_daily_rate_cents
     )
   }, [
+    autoFinalizeGraceDays,
+    autoFinalizePayPeriods,
     autoRecordAdvanceRepayments,
     current,
     employmentType,
@@ -131,6 +147,7 @@ export function NannyEmploymentSettings({ nanny }: { nanny: HouseholdNanny }) {
     overTablePercent,
     payPeriod,
     payReportingMode,
+    payrollHoursBasis,
     standardHours,
     startDate,
     taxNotes,
@@ -173,6 +190,9 @@ export function NannyEmploymentSettings({ nanny }: { nanny: HouseholdNanny }) {
               ? 0
               : 100,
         auto_record_advance_repayments: autoRecordAdvanceRepayments,
+        auto_finalize_pay_periods: autoFinalizePayPeriods,
+        auto_finalize_grace_days: clampAutoFinalizeGraceDays(parseFloat(autoFinalizeGraceDays)),
+        payroll_hours_basis: payrollHoursBasis,
         overnight_rate_cents:
           overnightCents !== null && Number.isFinite(overnightCents) ? overnightCents : null,
         overnight_start_time: overnightStartTime || '22:00',
@@ -421,6 +441,58 @@ export function NannyEmploymentSettings({ nanny }: { nanny: HouseholdNanny }) {
             </p>
           </span>
         </label>
+      </div>
+
+      <div className="space-y-4 rounded-lg border p-4">
+        <label className="flex cursor-pointer items-start gap-3">
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={autoFinalizePayPeriods}
+            onChange={(e) => setAutoFinalizePayPeriods(e.target.checked)}
+          />
+          <span>
+            <span className="font-medium">Auto-finalize pay periods</span>
+            <p className="mt-1 text-sm font-normal text-[var(--color-muted-foreground)]">
+              After each pay period ends, keep a window to correct hours. When that deadline
+              passes, the period is finalized automatically using the hours basis below.
+            </p>
+          </span>
+        </label>
+        {autoFinalizePayPeriods && (
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="auto-finalize-grace">Days after period ends to allow changes</Label>
+              <Input
+                id="auto-finalize-grace"
+                type="number"
+                min={0}
+                max={28}
+                step={1}
+                value={autoFinalizeGraceDays}
+                onChange={(e) => setAutoFinalizeGraceDays(e.target.value)}
+              />
+              <p className="text-xs text-[var(--color-muted-foreground)]">
+                Example: a Sunday week-ending with 2 days means you can edit through Tuesday.
+                The period auto-finalizes the next day.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="payroll-hours-basis">Hours used when auto-finalizing</Label>
+              <select
+                id="payroll-hours-basis"
+                className={selectCn}
+                value={payrollHoursBasis}
+                onChange={(e) =>
+                  setPayrollHoursBasis(e.target.value as 'scheduled' | 'actual')
+                }
+              >
+                <option value="scheduled">Scheduled (shifts + templates)</option>
+                <option value="actual">Actual (time entries)</option>
+              </select>
+            </div>
+          </div>
+        )}
       </div>
 
       {current && (

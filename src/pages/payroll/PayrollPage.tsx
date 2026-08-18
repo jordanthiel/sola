@@ -31,6 +31,7 @@ import { PaymentAdvancesCard } from '@/components/payroll/PaymentAdvancesCard'
 import {
   buildPayPeriodHistoryRows,
   payrollRepaymentsFullyRecorded,
+  recordedRepaymentCentsByAdvance,
   repaymentsForPayPeriod,
   summarizeAppliedRepaymentsByPayPeriod,
   totalRepaymentCents,
@@ -59,6 +60,7 @@ import type { HoursBasis, PayrollSnapshot } from '@/types/features'
 import type { Json } from '@/types/database'
 import { invalidateAdvanceQueries } from '@/lib/invalidate-advances'
 import { recordAdvanceRepaymentsForPeriod } from '@/lib/record-advance-repayments'
+import { autoFinalizeDeadlineDate, isPastAutoFinalizeDeadline } from '@/lib/auto-finalize'
 import type { NannyScheduleTemplate } from '@/types/schedule-template'
 import { formatCurrency, formatHours, selectCn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -123,6 +125,21 @@ export function PayrollPage() {
   }, [settings])
 
   const payStartDate = selectedNannyProfile?.start_date
+  const platformStartDate = selectedNannyProfile?.created_at
+
+  const periodRepayments = useMemo(() => {
+    if (!period || !advanceRepayments) return []
+    return repaymentsForPayPeriod(
+      advanceRepayments,
+      format(period.start, 'yyyy-MM-dd'),
+      format(period.end, 'yyyy-MM-dd'),
+    )
+  }, [advanceRepayments, period])
+
+  const recordedByAdvanceId = useMemo(
+    () => recordedRepaymentCentsByAdvance(periodRepayments),
+    [periodRepayments],
+  )
 
   const payableShifts = useMemo(() => {
     if (!period || !householdNannyId) return []
@@ -161,6 +178,7 @@ export function PayrollPage() {
       lineItems ?? [],
       timeOffRequests ?? [],
       holidayOverrides ?? [],
+      recordedByAdvanceId,
     )
   }, [
     settings,
@@ -171,6 +189,7 @@ export function PayrollPage() {
     payableShifts,
     timeOffRequests,
     holidayOverrides,
+    recordedByAdvanceId,
   ])
 
   const displaySummary = useMemo(() => {
@@ -182,15 +201,6 @@ export function PayrollPage() {
 
   const periodLabel =
     period ? `${format(period.start, 'MMM d')} – ${format(period.end, 'MMM d, yyyy')}` : ''
-
-  const periodRepayments = useMemo(() => {
-    if (!period || !advanceRepayments) return []
-    return repaymentsForPayPeriod(
-      advanceRepayments,
-      format(period.start, 'yyyy-MM-dd'),
-      format(period.end, 'yyyy-MM-dd'),
-    )
-  }, [advanceRepayments, period])
 
   const appliedToAdvancesCents = useMemo(
     () => totalRepaymentCents(periodRepayments),
@@ -610,6 +620,36 @@ export function PayrollPage() {
                 </div>
               )}
 
+              {settings.auto_finalize_pay_periods && !periodClose && period && (
+                <p className="rounded-lg border border-[var(--color-border)] bg-[var(--color-muted)]/40 px-4 py-3 text-sm text-[var(--color-muted-foreground)]">
+                  {isPastAutoFinalizeDeadline(period.end, settings.auto_finalize_grace_days) ? (
+                    <>
+                      The edit deadline has passed. This pay period will auto-finalize shortly.
+                    </>
+                  ) : format(period.end, 'yyyy-MM-dd') >= format(new Date(), 'yyyy-MM-dd') ? (
+                    <>
+                      After this period ends, you have {settings.auto_finalize_grace_days} day
+                      {settings.auto_finalize_grace_days === 1 ? '' : 's'} to change hours
+                      (through{' '}
+                      {format(
+                        autoFinalizeDeadlineDate(period.end, settings.auto_finalize_grace_days),
+                        'MMM d',
+                      )}
+                      ). It then auto-finalizes.
+                    </>
+                  ) : (
+                    <>
+                      You can still change hours through{' '}
+                      {format(
+                        autoFinalizeDeadlineDate(period.end, settings.auto_finalize_grace_days),
+                        'MMM d, yyyy',
+                      )}
+                      . This period auto-finalizes after that deadline.
+                    </>
+                  )}
+                </p>
+              )}
+
               <div className="flex flex-wrap gap-2 border-t pt-4">
                 {!isDeactivated && (
                   <Button variant="outline" size="sm" onClick={exportShiftCsv}>
@@ -714,6 +754,7 @@ export function PayrollPage() {
         <PaymentAdvancesCard
           householdNannyId={householdNannyId}
           payStartDate={payStartDate}
+          platformStartDate={platformStartDate}
           templates={templates as NannyScheduleTemplate[] | undefined}
         />
       )}

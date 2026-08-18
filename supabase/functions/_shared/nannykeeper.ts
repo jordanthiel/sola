@@ -34,14 +34,47 @@ export async function nkFetch<T = unknown>(
   }
 
   if (!res.ok) {
-    const body = parsed as { error?: { message?: string; example?: unknown }; message?: string }
-    const message =
-      body?.error?.message ||
+    const body = parsed as {
+      error?: {
+        message?: string
+        code?: string
+        details?: unknown
+        example?: unknown
+        docs_url?: string
+      }
+      message?: string
+    }
+    const nkError = body?.error
+    let message =
+      nkError?.message ||
       body?.message ||
       `NannyKeeper API error (${res.status})`
-    const err = new Error(message) as Error & { status?: number; body?: unknown }
+    if (Array.isArray(nkError?.details) && nkError.details.length > 0) {
+      const fields = nkError.details
+        .map((d) => {
+          const item = d as { field?: string; message?: string }
+          if (item.field && item.message) return `${item.field}: ${item.message}`
+          if (item.field) return item.field
+          return item.message
+        })
+        .filter(Boolean)
+      if (fields.length) message = `${message} (${fields.join('; ')})`
+    }
+    const err = new Error(message) as Error & {
+      status?: number
+      body?: unknown
+      code?: string
+      details?: string
+    }
     err.status = res.status
     err.body = parsed
+    err.code = nkError?.code
+    err.details =
+      typeof nkError?.details === 'string'
+        ? nkError.details
+        : nkError?.details
+          ? JSON.stringify(nkError.details)
+          : undefined
     throw err
   }
 

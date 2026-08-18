@@ -16,10 +16,21 @@ export function totalAdvanceBalance(advances: PaymentAdvance[]): number {
     .reduce((sum, a) => sum + a.balance_cents, 0)
 }
 
+export function recordedRepaymentCentsByAdvance(
+  repayments: AdvanceRepayment[],
+): Record<string, number> {
+  const totals: Record<string, number> = {}
+  for (const r of repayments) {
+    totals[r.payment_advance_id] = (totals[r.payment_advance_id] ?? 0) + r.amount_cents
+  }
+  return totals
+}
+
 export function calculateAdvanceDeductions(
   advances: PaymentAdvance[],
   overtimePayCents: number,
   grossPayCents: number,
+  recordedByAdvanceId: Record<string, number> = {},
 ): { totalDeductionCents: number; lines: AdvanceDeductionLine[] } {
   const open = advances
     .filter((a) => a.status === 'open' && a.balance_cents > 0)
@@ -30,10 +41,15 @@ export function calculateAdvanceDeductions(
   const lines: AdvanceDeductionLine[] = []
 
   for (const advance of open.filter((a) => a.repayment_mode === 'overtime_only')) {
-    const deducted = Math.min(advance.balance_cents, otPool)
-    if (deducted <= 0) continue
-    otPool -= deducted
-    paycheckPool = Math.max(0, paycheckPool - deducted)
+    const already = recordedByAdvanceId[advance.id] ?? 0
+    const deducted = Math.max(0, Math.min(advance.balance_cents, otPool) - already)
+    if (deducted <= 0) {
+      otPool = Math.max(0, otPool - already)
+      paycheckPool = Math.max(0, paycheckPool - already)
+      continue
+    }
+    otPool -= deducted + already
+    paycheckPool = Math.max(0, paycheckPool - deducted - already)
     lines.push({
       advanceId: advance.id,
       deductedCents: deducted,
@@ -42,10 +58,17 @@ export function calculateAdvanceDeductions(
   }
 
   for (const advance of open.filter((a) => a.repayment_mode === 'per_paycheck')) {
+    const already = recordedByAdvanceId[advance.id] ?? 0
     const installment = advance.repayment_per_paycheck_cents ?? advance.balance_cents
-    const deducted = Math.min(advance.balance_cents, installment, paycheckPool)
-    if (deducted <= 0) continue
-    paycheckPool -= deducted
+    const deducted = Math.max(
+      0,
+      Math.min(advance.balance_cents, installment, paycheckPool) - already,
+    )
+    if (deducted <= 0) {
+      paycheckPool = Math.max(0, paycheckPool - already)
+      continue
+    }
+    paycheckPool -= deducted + already
     lines.push({
       advanceId: advance.id,
       deductedCents: deducted,
@@ -84,11 +107,9 @@ export function payrollRepaymentsFullyRecorded(
   lines: AdvanceDeductionLine[],
 ): boolean {
   if (!lines.length) return true
-  const payrollRows = repayments.filter(
-    (r) => r.source === 'payroll' && r.pay_period_start === periodStart,
-  )
+  const periodRows = repayments.filter((r) => r.pay_period_start === periodStart)
   return lines.every((line) => {
-    const paid = payrollRows
+    const paid = periodRows
       .filter((r) => r.payment_advance_id === line.advanceId)
       .reduce((sum, r) => sum + r.amount_cents, 0)
     return paid >= line.deductedCents

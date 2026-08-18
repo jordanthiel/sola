@@ -65,7 +65,13 @@ serve(async (req) => {
     }
   } catch (e) {
     const serialized = serializeError(e)
-    console.error('nannykeeper-api error', { action, householdId, ...serialized })
+    const nkBody = (e as { body?: unknown })?.body
+    console.error('nannykeeper-api error', {
+      action,
+      householdId,
+      ...serialized,
+      body: nkBody,
+    })
     const status =
       typeof (e as { status?: number })?.status === 'number'
         ? (e as { status: number }).status
@@ -74,7 +80,7 @@ serve(async (req) => {
       {
         error: serialized.message,
         details: serialized.details,
-        body: (e as { body?: unknown })?.body,
+        body: nkBody,
       },
       status >= 400 && status < 600 ? status : 500,
     )
@@ -165,7 +171,7 @@ async function handleCreateEmployee(
   const admin = getServiceSupabase()
   const { data: employer } = await admin
     .from('nk_employers')
-    .select('id, employer_id')
+    .select('id, employer_id, state')
     .eq('household_id', householdId)
     .maybeSingle()
   if (!employer) throw new Error('Create a NannyKeeper employer for this household first')
@@ -179,17 +185,29 @@ async function handleCreateEmployee(
 
   const { data: nanny, error: nannyError } = await admin
     .from('household_nannies')
-    .select('id, user_id')
+    .select('id, user_id, first_name, last_name, email, start_date')
     .eq('id', householdNannyId)
     .eq('household_id', householdId)
     .maybeSingle()
   if (nannyError || !nanny) throw new Error('Nanny not found in this household')
 
-  const email = String(body.email ?? '').trim()
+  const { data: settings } = await admin
+    .from('employment_settings')
+    .select('hourly_rate_cents, pay_period')
+    .eq('household_nanny_id', householdNannyId)
+    .maybeSingle()
+  if (!settings) {
+    throw new Error('Set employment pay rate and pay period for this nanny before linking')
+  }
+  if (!settings.hourly_rate_cents || settings.hourly_rate_cents <= 0) {
+    throw new Error('Set a positive hourly rate for this nanny before linking to NannyKeeper')
+  }
+
+  const email = String(body.email ?? nanny.email ?? '').trim()
   if (!email) throw new Error('email is required')
 
-  let firstName = String(body.firstName ?? '').trim()
-  let lastName = String(body.lastName ?? '').trim()
+  let firstName = String(body.firstName ?? nanny.first_name ?? '').trim()
+  let lastName = String(body.lastName ?? nanny.last_name ?? '').trim()
   if (!firstName || !lastName) {
     let display = email.split('@')[0] || 'Nanny'
     if (nanny.user_id) {
@@ -205,14 +223,41 @@ async function handleCreateEmployee(
     lastName = lastName || parts.slice(1).join(' ') || 'Employee'
   }
 
-  const startDate = body.startDate ? String(body.startDate) : undefined
+  const startDate = String(body.startDate ?? nanny.start_date ?? '').trim()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
+    throw new Error('A valid start date (YYYY-MM-DD) is required')
+  }
+
+  const workState = String(body.workState ?? employer.state ?? '')
+    .trim()
+    .toUpperCase()
+  if (!/^[A-Z]{2}$/.test(workState)) {
+    throw new Error('work_state (2-letter state) is required')
+  }
+
+  const payFrequency = mapSoolaPayPeriod(
+    String(body.payFrequency ?? settings.pay_period ?? 'biweekly'),
+  )
+  const payRate = Number(
+    body.payRate != null ? body.payRate : settings.hourly_rate_cents / 100,
+  )
+  if (!Number.isFinite(payRate) || payRate <= 0) {
+    throw new Error('pay_rate must be a positive number')
+  }
+
+  // NannyKeeper requires start_date, pay_type, pay_rate, pay_frequency, work_state
+  // (email is optional for portal invite but we send it when available).
   const payload: Record<string, unknown> = {
     employer_id: employer.employer_id,
     first_name: firstName,
     last_name: lastName,
     email,
+    start_date: startDate,
+    pay_type: 'hourly',
+    pay_rate: payRate,
+    pay_frequency: payFrequency,
+    work_state: workState,
   }
-  if (startDate) payload.start_date = startDate
 
   const created = await nkFetch<{
     data?: { id?: string; portal_url?: string; onboarding_url?: string }
@@ -221,6 +266,14 @@ async function handleCreateEmployee(
   }>('/employees', {
     method: 'POST',
     body: JSON.stringify(payload),
+  }).catch((e) => {
+    const message = e instanceof Error ? e.message : String(e)
+    if (/do not have access|access denied/i.test(message)) {
+      throw new Error(
+        'NannyKeeper denied access to this employer. In the NannyKeeper dashboard, finish employer setup (EIN) for this household, then try linking again.',
+      )
+    }
+    throw e
   })
 
   const employeeId = created?.data?.id ?? created?.id

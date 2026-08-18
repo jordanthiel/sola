@@ -20,6 +20,7 @@ import {
 import { NotificationBell } from '@/components/notifications/NotificationBell'
 import { NannyPreviewBanner, NannyPreviewSwitcher } from '@/components/layout/NannyPreviewControls'
 import { useNotificationDelivery } from '@/hooks/useNotificationDelivery'
+import { useAutoFinalizePayPeriods } from '@/hooks/useAutoFinalizePayPeriods'
 import { useAuth } from '@/contexts/AuthContext'
 import { useHousehold } from '@/contexts/HouseholdContext'
 import { accountKindLabel, isFamilyAccount } from '@/types/account'
@@ -199,6 +200,7 @@ function HouseholdSelect({
 
 export function AppShell() {
   useNotificationDelivery()
+  useAutoFinalizePayPeriods()
   const { profile, signOut, accountKind } = useAuth()
   const { isParent, isNanny, isNannyPreview, activeHousehold } = useHousehold()
   const { isDeactivated, isLoading: nannyAccessLoading } = useMyNannyAccess()

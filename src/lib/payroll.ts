@@ -71,6 +71,7 @@ export function calculatePayroll(
   advances: PaymentAdvance[],
   vacationRequests: TimeOffRequest[] = [],
   holidayOverrides: Pick<HouseholdHoliday, 'holiday_key' | 'enabled'>[] = [],
+  recordedRepaymentsByAdvanceId: Record<string, number> = {},
 ): PayrollSummary {
   const holidayPayItems = holidayPayItemsInPeriod(
     holidayOverrides,
@@ -126,8 +127,13 @@ export function calculatePayroll(
     advances,
     overtimePayCents,
     grossPayCents,
+    recordedRepaymentsByAdvanceId,
   )
-  const netPayCents = Math.max(0, grossPayCents - totalDeductionCents)
+  const recordedThisPeriodCents = Object.values(recordedRepaymentsByAdvanceId).reduce(
+    (sum, cents) => sum + cents,
+    0,
+  )
+  const netPayCents = Math.max(0, grossPayCents - totalDeductionCents - recordedThisPeriodCents)
   const reporting = splitPayByReporting(
     regularPayCents + overnightPayCents + vacationPayCents,
     overtimePayCents,

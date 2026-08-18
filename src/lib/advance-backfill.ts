@@ -13,12 +13,35 @@ export interface PayPeriodOption {
   suggestedCents: number
 }
 
+export interface PrePlatformPeriodOptions {
+  /** Employment start — hours/paychecks before this are not payable. */
+  payStartDate?: string | null
+  /** When this nanny was added on the platform; in-app payroll starts here. */
+  platformStartDate?: string | null
+}
+
+/** Date the household started tracking this nanny's payroll in the app. */
+export function platformPayrollStartDate(
+  payStartDate?: string | null,
+  platformCreatedAt?: string | null,
+): string | null {
+  return platformCreatedAt?.slice(0, 10) || payStartDate || null
+}
+
 export function completedPayPeriods(
   payPeriod: PayPeriodType,
   issuedOn: string,
   through: Date = new Date(),
+  options?: PrePlatformPeriodOptions,
 ): { start: Date; end: Date }[] {
-  const endBound = startOfDay(through)
+  const todayBound = startOfDay(through)
+  const platformBound = options?.platformStartDate
+    ? startOfDay(parseISO(options.platformStartDate))
+    : todayBound
+  const endBound = isBefore(platformBound, todayBound) ? platformBound : todayBound
+  const employmentStart = options?.payStartDate
+    ? startOfDay(parseISO(options.payStartDate))
+    : null
   let anchor = parseISO(issuedOn)
   const out: { start: Date; end: Date }[] = []
   let guard = 0
@@ -32,7 +55,9 @@ export function completedPayPeriods(
       continue
     }
     if (end < endBound) {
-      out.push({ start, end })
+      if (!employmentStart || end >= employmentStart) {
+        out.push({ start, end })
+      }
     }
     anchor = addDays(end, 1)
     guard++
@@ -46,8 +71,9 @@ export function suggestPerPaycheckBackfill(
   perPaycheckCents: number,
   totalCents: number,
   payPeriod: PayPeriodType,
+  options?: PrePlatformPeriodOptions,
 ): { suggestedCents: number; periodCount: number } {
-  const periods = completedPayPeriods(payPeriod, issuedOn)
+  const periods = completedPayPeriods(payPeriod, issuedOn, new Date(), options)
   const suggestedCents = Math.min(totalCents, periods.length * perPaycheckCents)
   return { suggestedCents, periodCount: periods.length }
 }
@@ -57,6 +83,7 @@ export interface ScheduleBackfillInput {
   templates: NannyScheduleTemplate[]
   householdNannyId: string
   payStartDate?: string | null
+  platformStartDate?: string | null
 }
 
 function shiftsForPeriod(
@@ -101,13 +128,25 @@ function payrollAmountsForPeriod(
   return { grossPayCents: regularPayCents + overtimePayCents, overtimePayCents, overtimeMinutes }
 }
 
+function prePlatformOptions(schedule: ScheduleBackfillInput): PrePlatformPeriodOptions {
+  return {
+    payStartDate: schedule.payStartDate,
+    platformStartDate: schedule.platformStartDate,
+  }
+}
+
 export function suggestOvertimeBackfill(
   issuedOn: string,
   totalCents: number,
   settings: EmploymentSetting,
   schedule: ScheduleBackfillInput,
 ): { suggestedCents: number; periodCount: number; totalOvertimeMinutes: number } {
-  const periods = completedPayPeriods(settings.pay_period, issuedOn)
+  const periods = completedPayPeriods(
+    settings.pay_period,
+    issuedOn,
+    new Date(),
+    prePlatformOptions(schedule),
+  )
   let balance = totalCents
   let repaid = 0
   let totalOvertimeMinutes = 0
@@ -162,7 +201,12 @@ export function buildPeriodBackfillOptions(
   settings: EmploymentSetting,
   schedule: ScheduleBackfillInput,
 ): PayPeriodOption[] {
-  const periods = completedPayPeriods(settings.pay_period, issuedOn)
+  const periods = completedPayPeriods(
+    settings.pay_period,
+    issuedOn,
+    new Date(),
+    prePlatformOptions(schedule),
+  )
   let balance = amountCents
   const options: PayPeriodOption[] = []
 

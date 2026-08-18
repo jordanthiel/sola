@@ -253,6 +253,9 @@ export interface Database {
           pay_reporting_mode: PayReportingMode
           over_table_percent: number
           auto_record_advance_repayments: boolean
+          auto_finalize_pay_periods: boolean
+          auto_finalize_grace_days: number
+          payroll_hours_basis: 'scheduled' | 'actual'
           overnight_rate_cents: number | null
           overnight_start_time: string
           overnight_end_time: string
@@ -275,6 +278,9 @@ export interface Database {
           pay_reporting_mode?: PayReportingMode
           over_table_percent?: number
           auto_record_advance_repayments?: boolean
+          auto_finalize_pay_periods?: boolean
+          auto_finalize_grace_days?: number
+          payroll_hours_basis?: 'scheduled' | 'actual'
           overnight_rate_cents?: number | null
           overnight_start_time?: string
           overnight_end_time?: string
@@ -297,6 +303,9 @@ export interface Database {
           pay_reporting_mode?: PayReportingMode
           over_table_percent?: number
           auto_record_advance_repayments?: boolean
+          auto_finalize_pay_periods?: boolean
+          auto_finalize_grace_days?: number
+          payroll_hours_basis?: 'scheduled' | 'actual'
           overnight_rate_cents?: number | null
           overnight_start_time?: string
           overnight_end_time?: string
@@ -1273,6 +1282,18 @@ export interface Database {
           p_household_id: string
           p_period_start: string
           p_repayments: { advance_id: string; amount_cents: number }[]
+        }
+        Returns: number
+      }
+      auto_finalize_pay_period: {
+        Args: {
+          p_household_id: string
+          p_household_nanny_id: string
+          p_period_start: string
+          p_period_end: string
+          p_hours_basis: 'scheduled' | 'actual'
+          p_snapshot: Json
+          p_repayments?: { advance_id: string; amount_cents: number }[]
         }
         Returns: number
       }

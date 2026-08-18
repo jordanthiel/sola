@@ -4,7 +4,11 @@ export async function invokeNannyKeeperApi<T>(body: Record<string, unknown>): Pr
   const { data, error } = await supabase.functions.invoke('nannykeeper-api', { body })
   if (error) throw error
   if (data && typeof data === 'object' && 'error' in data && (data as { error?: string }).error) {
-    throw new Error((data as { error: string }).error)
+    const payload = data as { error: string; details?: string }
+    const message = payload.details
+      ? `${payload.error} (${payload.details})`
+      : payload.error
+    throw new Error(message)
   }
   return data as T
 }
