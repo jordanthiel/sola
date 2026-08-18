@@ -12,6 +12,7 @@ import {
   useScheduleTemplates,
 } from '@/hooks/useHouseholdData'
 import { nannyDisplayName } from '@/lib/nanny'
+import { platformPayrollStartDate } from '@/lib/advance-backfill'
 import {
   blockHasLateReport,
   payableShiftMinutes,
@@ -83,7 +84,7 @@ export function ParentDashboard() {
         nannyId,
         weekStart,
         weekEnd,
-        nanny?.start_date,
+        platformPayrollStartDate(nanny?.start_date, nanny?.created_at),
       )
       return total + shifts.reduce((s, sh) => s + payableShiftMinutes(sh), 0)
     }, 0)

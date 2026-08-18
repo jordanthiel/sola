@@ -84,16 +84,24 @@ export function repaymentModeLabel(mode: AdvanceRepaymentMode): string {
   return mode === 'overtime_only' ? 'Overtime only' : 'Each paycheck'
 }
 
-/** Repayments tied to this pay period (payroll rows or paid_on within the period). */
+/** Repayments tied to this pay period. Prefer pay_period_start when present so a
+ *  backfill dated on period-end is not also counted in an adjacent period. */
+export function repaymentMatchesPayPeriod(
+  repayment: AdvanceRepayment,
+  periodStart: string,
+  periodEnd: string,
+): boolean {
+  if (repayment.pay_period_start) return repayment.pay_period_start === periodStart
+  return repayment.paid_on >= periodStart && repayment.paid_on <= periodEnd
+}
+
 export function repaymentsForPayPeriod(
   repayments: AdvanceRepayment[],
   periodStart: string,
   periodEnd: string,
 ): AdvanceRepayment[] {
-  return repayments.filter(
-    (r) =>
-      r.pay_period_start === periodStart ||
-      (r.paid_on >= periodStart && r.paid_on <= periodEnd),
+  return dedupeAdvanceRepayments(repayments).filter((r) =>
+    repaymentMatchesPayPeriod(r, periodStart, periodEnd),
   )
 }
 
@@ -114,6 +122,48 @@ export function payrollRepaymentsFullyRecorded(
       .reduce((sum, r) => sum + r.amount_cents, 0)
     return paid >= line.deductedCents
   })
+}
+
+function addDaysIso(isoDate: string, days: number): string {
+  return format(addDays(parseISO(isoDate), days), 'yyyy-MM-dd')
+}
+
+function payrollPeriodStart(repayment: AdvanceRepayment): string {
+  return repayment.pay_period_start ?? repayment.paid_on
+}
+
+/** Drop pre-platform backfill rows that duplicate an in-app payroll repayment for the same period. */
+export function dedupeAdvanceRepayments(repayments: AdvanceRepayment[]): AdvanceRepayment[] {
+  const payrollStarts = new Map<string, Set<string>>()
+  for (const r of repayments) {
+    if (r.source !== 'payroll') continue
+    const starts = payrollStarts.get(r.payment_advance_id) ?? new Set<string>()
+    starts.add(payrollPeriodStart(r))
+    payrollStarts.set(r.payment_advance_id, starts)
+  }
+
+  return repayments.filter((r) => {
+    if (r.source !== 'backfill') return true
+    const starts = payrollStarts.get(r.payment_advance_id)
+    if (!starts) return true
+    if (r.pay_period_start && starts.has(r.pay_period_start)) return false
+    for (const start of starts) {
+      // Backfill was stored on period end (weekly Sunday or biweekly Sunday).
+      if (r.paid_on === addDaysIso(start, 6) || r.paid_on === addDaysIso(start, 13)) return false
+    }
+    return true
+  })
+}
+
+/** Pay-period range when known; otherwise the payment date. */
+export function repaymentPeriodLabel(
+  repayment: AdvanceRepayment,
+  payPeriod?: PayPeriodType | null,
+): string {
+  const startStr = repayment.pay_period_start
+  if (!startStr || !payPeriod) return repayment.paid_on
+  const { start, end } = getPayPeriodBounds(payPeriod, parseISO(startStr))
+  return `${format(start, 'yyyy-MM-dd')} – ${format(end, 'yyyy-MM-dd')}`
 }
 
 export interface PayPeriodAppliedRepayment {
@@ -138,7 +188,7 @@ export function summarizeAppliedRepaymentsByPayPeriod(
   payPeriod: PayPeriodType,
 ): PayPeriodAppliedRepayment[] {
   const totals = new Map<string, number>()
-  for (const r of repayments) {
+  for (const r of dedupeAdvanceRepayments(repayments)) {
     const key = periodStartForRepayment(r, payPeriod)
     totals.set(key, (totals.get(key) ?? 0) + r.amount_cents)
   }

@@ -61,6 +61,10 @@ import type { Json } from '@/types/database'
 import { invalidateAdvanceQueries } from '@/lib/invalidate-advances'
 import { recordAdvanceRepaymentsForPeriod } from '@/lib/record-advance-repayments'
 import { autoFinalizeDeadlineDate, isPastAutoFinalizeDeadline } from '@/lib/auto-finalize'
+import {
+  periodEndsBeforePayrollTracking,
+  platformPayrollStartDate,
+} from '@/lib/advance-backfill'
 import type { NannyScheduleTemplate } from '@/types/schedule-template'
 import { formatCurrency, formatHours, selectCn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -85,12 +89,23 @@ export function PayrollPage() {
 
   const { data: nannies } = useNannies()
   const householdNannyId = isNanny ? myNanny?.id : selectedNanny || nannies?.[0]?.id
+  const selectedNannyProfile =
+    (isNanny ? myNanny : nannies?.find((n) => n.id === householdNannyId)) ?? undefined
+  const employmentStartDate = selectedNannyProfile?.start_date
+  const trackingStart = platformPayrollStartDate(
+    employmentStartDate,
+    selectedNannyProfile?.created_at,
+  )
+  const periodAnchorDate =
+    trackingStart && periodAnchor < trackingStart ? trackingStart : periodAnchor
 
   const { data: settingsList } = useEmploymentSettings(householdNannyId)
   const settings = settingsList?.[0]
   const period = settings
-    ? getPayPeriodBounds(settings.pay_period, new Date(periodAnchor))
+    ? getPayPeriodBounds(settings.pay_period, new Date(periodAnchorDate))
     : null
+  const beforeTracking =
+    !!period && periodEndsBeforePayrollTracking(period.end, trackingStart)
 
   const from = period?.start.toISOString()
   const to = period?.end.toISOString()
@@ -111,9 +126,6 @@ export function PayrollPage() {
   const { data: closes } = usePayPeriodCloses(householdNannyId)
   const qc = useQueryClient()
 
-  const selectedNannyProfile =
-    (isNanny ? myNanny : nannies?.find((n) => n.id === householdNannyId)) ?? undefined
-
   const payReportingExtras = useMemo(() => {
     if (!settings) return {}
     const { mode, overTablePercent } = getPayReportingFromSettings(settings)
@@ -123,9 +135,6 @@ export function PayrollPage() {
         : payReportingModeLabel(mode)
     return { payReportingMode: mode, payReportingLabel: label }
   }, [settings])
-
-  const payStartDate = selectedNannyProfile?.start_date
-  const platformStartDate = selectedNannyProfile?.created_at
 
   const periodRepayments = useMemo(() => {
     if (!period || !advanceRepayments) return []
@@ -152,22 +161,22 @@ export function PayrollPage() {
             householdNannyId,
             period.start,
             period.end,
-            payStartDate,
+            trackingStart,
           )
         : []
 
     const actualShifts = timeEntries?.length
       ? filterPayableShiftsByStartDate(
           timeEntriesToPayableShifts(timeEntries, blocks ?? []),
-          payStartDate,
+          trackingStart,
         )
       : scheduledShifts
 
     return hoursBasis === 'actual' ? actualShifts : scheduledShifts
-  }, [blocks, templates, period, householdNannyId, hoursBasis, timeEntries, payStartDate])
+  }, [blocks, templates, period, householdNannyId, hoursBasis, timeEntries, trackingStart])
 
   const summary = useMemo(() => {
-    if (!settings || !period || !householdNannyId) return null
+    if (beforeTracking || !settings || !period || !householdNannyId) return null
 
     return calculateExtendedPayroll(
       payableShifts,
@@ -190,6 +199,7 @@ export function PayrollPage() {
     timeOffRequests,
     holidayOverrides,
     recordedByAdvanceId,
+    beforeTracking,
   ])
 
   const displaySummary = useMemo(() => {
@@ -222,8 +232,10 @@ export function PayrollPage() {
       advanceRepayments ?? [],
       settings.pay_period,
     )
-    return buildPayPeriodHistoryRows(closes, summaries)
-  }, [advanceRepayments, closes, settings])
+    return buildPayPeriodHistoryRows(closes, summaries).filter(
+      (row) => !periodEndsBeforePayrollTracking(row.periodEnd, trackingStart),
+    )
+  }, [advanceRepayments, closes, settings, trackingStart])
 
   const recordRepayments = useMutation({
     mutationFn: async () => {
@@ -324,7 +336,7 @@ export function PayrollPage() {
       householdNannyId,
       period.start,
       period.end,
-      payStartDate,
+      trackingStart,
     )
     const names: Record<string, string> = {
       [householdNannyId]: selectedNannyProfile ? nannyDisplayName(selectedNannyProfile) : 'Nanny',
@@ -410,7 +422,17 @@ export function PayrollPage() {
           )}
           <div className="space-y-2">
             <Label>Pay period anchor</Label>
-            <DatePicker value={periodAnchor} onChange={setPeriodAnchor} />
+            <DatePicker
+              value={periodAnchorDate}
+              onChange={setPeriodAnchor}
+              min={trackingStart ?? undefined}
+            />
+            {trackingStart && (
+              <p className="max-w-xs text-xs text-[var(--color-muted-foreground)]">
+                Payroll in the app starts {format(new Date(`${trackingStart}T12:00:00`), 'MMM d, yyyy')}.
+                Earlier periods are not shown.
+              </p>
+            )}
           </div>
           {!isDeactivated && (
             <div className="space-y-2">
@@ -465,6 +487,16 @@ export function PayrollPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
+              {beforeTracking ? (
+                <p className="text-sm text-[var(--color-muted-foreground)]">
+                  This pay period ended before payroll tracking started in the app
+                  {trackingStart
+                    ? ` (${format(new Date(`${trackingStart}T12:00:00`), 'MMM d, yyyy')})`
+                    : ''}
+                  . Choose a later date to see earnings.
+                </p>
+              ) : (
+                <>
               <div className="grid gap-4 md:grid-cols-2">
                 <Stat
                   label="Total hours"
@@ -714,10 +746,12 @@ export function PayrollPage() {
                   )}
                 </div>
               )}
+                </>
+              )}
             </CardContent>
           </Card>
 
-          {isParent && householdNannyId && periodStartStr && (
+          {isParent && !beforeTracking && householdNannyId && periodStartStr && (
             <PayrollLineItemsCard
               householdNannyId={householdNannyId}
               periodStart={periodStartStr}
@@ -725,7 +759,7 @@ export function PayrollPage() {
             />
           )}
 
-          {isParent && periodClose && (
+          {isParent && !beforeTracking && periodClose && (
             <MarkPeriodPaidCard
               payPeriodCloseId={periodClose.id}
               defaultAmountCents={
@@ -738,7 +772,7 @@ export function PayrollPage() {
             />
           )}
 
-          {isParent && householdNannyId && period && (
+          {isParent && !beforeTracking && householdNannyId && period && (
             <NannyKeeperPayrollActions
               householdNannyId={householdNannyId}
               payPeriodCloseId={periodClose?.id}
@@ -753,8 +787,8 @@ export function PayrollPage() {
       {isParent && (
         <PaymentAdvancesCard
           householdNannyId={householdNannyId}
-          payStartDate={payStartDate}
-          platformStartDate={platformStartDate}
+          payStartDate={employmentStartDate}
+          platformStartDate={selectedNannyProfile?.created_at}
           templates={templates as NannyScheduleTemplate[] | undefined}
         />
       )}

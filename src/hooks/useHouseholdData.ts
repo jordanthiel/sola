@@ -255,17 +255,21 @@ export function useEmploymentSettings(householdNannyId?: string) {
 }
 
 export function usePaymentAdvances(householdNannyId?: string) {
-  const { activeHousehold } = useHousehold()
+  const { activeHousehold, isNanny } = useHousehold()
+  const { data: myNanny, isFetched: myNannyFetched } = useMyHouseholdNanny()
+  const effectiveId = isNanny ? myNanny?.id : householdNannyId
+
   return useQuery({
-    queryKey: ['advances', activeHousehold?.id, householdNannyId],
-    enabled: !!activeHousehold,
+    queryKey: ['advances', activeHousehold?.id, effectiveId ?? 'all'],
+    enabled: !!activeHousehold && (!isNanny || myNannyFetched),
     queryFn: async () => {
       let q = supabase
         .from('payment_advances')
         .select('*')
         .eq('household_id', activeHousehold!.id)
+        .neq('status', 'void')
         .order('issued_on', { ascending: false })
-      if (householdNannyId) q = q.eq('household_nanny_id', householdNannyId)
+      if (effectiveId) q = q.eq('household_nanny_id', effectiveId)
       const { data, error } = await q
       if (error) throw error
       return data as PaymentAdvance[]

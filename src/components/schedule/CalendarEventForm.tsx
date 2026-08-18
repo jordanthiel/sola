@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { addHours, format, parseISO, startOfDay } from 'date-fns'
+import { useHouseholdHolidays } from '@/hooks/useHouseholdHolidays'
 import { useAuth } from '@/contexts/AuthContext'
 import { useHousehold } from '@/contexts/HouseholdContext'
 import type { useCalendarMutations } from '@/hooks/useCalendarMutations'
@@ -28,6 +29,7 @@ import { isTemplateOccurrence } from '@/lib/schedule'
 import type { CalendarDialogState } from '@/types/calendar-dialog'
 import type { HouseholdNanny } from '@/types/household-nanny'
 import { nannyDisplayName } from '@/lib/nanny'
+import { TimeOffHoursFields } from '@/components/time-off/TimeOffHoursFields'
 import { ChildrenMultiSelect } from '@/components/activities/ChildrenMultiSelect'
 import {
   activityTypeLabel,
@@ -45,6 +47,11 @@ import {
 } from '@/lib/plan-repeat'
 import { recurringPlanScheduleFromStartsAt } from '@/lib/recurring-plans'
 import { supabase } from '@/lib/supabase'
+import {
+  calculatedTimeOffHours,
+  hoursPerDayFromTotal,
+  parseHoursPerDay,
+} from '@/lib/pto'
 import type { ActivityType, Child, MoodType, TimeOffType } from '@/types/database'
 import { Button } from '@/components/ui/button'
 import { DatePicker } from '@/components/ui/date-picker'
@@ -88,6 +95,8 @@ export function CalendarEventForm({
 }) {
   const { user } = useAuth()
   const { isParent, isNanny, activeHousehold } = useHousehold()
+  const { data: holidayOverrides } = useHouseholdHolidays()
+  const holidays = holidayOverrides ?? []
   const defaultPlanTimes = defaultPlanDatetimeRange()
   const qc = useQueryClient()
   const isCreate = state.mode === 'create'
@@ -141,7 +150,14 @@ export function CalendarEventForm({
   const [endsOn, setEndsOn] = useState(
     event ? toDateInputValue(event.endsAt) : toDateInputValue(baseDay),
   )
-  const [hours, setHours] = useState(String(event?.timeOffHours ?? 8))
+  const [hoursPerDay, setHoursPerDay] = useState(
+    hoursPerDayFromTotal(
+      event?.timeOffHours,
+      event ? toDateInputValue(event.startsAt) : toDateInputValue(baseDay),
+      event ? toDateInputValue(event.endsAt) : toDateInputValue(baseDay),
+      holidays,
+    ),
+  )
   const [nannyJoinsVacation, setNannyJoinsVacation] = useState(
     event?.timeOffNannyJoinsVacation ?? false,
   )
@@ -208,7 +224,14 @@ export function CalendarEventForm({
     setShiftOvernightEndTime(block?.overnight_end_time?.slice(0, 5) ?? '')
     setHolidayWorked(block?.holiday_worked ?? (state.mode === 'create' ? state.draft?.holidayWorked ?? false : false))
     setTimeOffType(ev?.timeOffType ?? 'pto')
-    setHours(String(ev?.timeOffHours ?? 8))
+    setHoursPerDay(
+      hoursPerDayFromTotal(
+        ev?.timeOffHours,
+        ev ? toDateInputValue(ev.startsAt) : '',
+        ev ? toDateInputValue(ev.endsAt) : '',
+        holidays,
+      ),
+    )
     setNannyJoinsVacation(ev?.timeOffNannyJoinsVacation ?? false)
     setVacationDailyRate(
       ev?.timeOffVacationRateCents == null ? '' : (ev.timeOffVacationRateCents / 100).toFixed(2),
@@ -264,7 +287,7 @@ export function CalendarEventForm({
 
   const timeOffTypeOptions = isParent
     ? TIME_OFF_TYPES
-    : TIME_OFF_TYPES.filter((t) => t !== 'vacation')
+    : TIME_OFF_TYPES.filter((t) => t !== 'vacation' || timeOffType === 'vacation')
 
   async function handleSave() {
     setError('')
@@ -298,13 +321,19 @@ export function CalendarEventForm({
         if (!nid) throw new Error('Nanny profile required')
         const isVacation = timeOffType === 'vacation'
         const vacationRateCents = isVacation ? currencyToCents(vacationDailyRate) : null
+        const parsedHoursPerDay = parseHoursPerDay(hoursPerDay)
+        const totalHours =
+          parsedHoursPerDay == null
+            ? 0
+            : calculatedTimeOffHours(startsOn, endsOn, parsedHoursPerDay, holidays)
+        if (totalHours <= 0) throw new Error('Choose a date range with at least one working day')
         if (isCreate) {
           await mutations.createTimeOff.mutateAsync({
             householdNannyId: nid,
             type: timeOffType,
             startsOn,
             endsOn,
-            hours: parseFloat(hours),
+            hours: totalHours,
             notes: notes.trim() || null,
             status: isParent ? 'approved' : 'pending',
             nannyJoinsVacation: isVacation ? nannyJoinsVacation : false,
@@ -316,7 +345,7 @@ export function CalendarEventForm({
             type: timeOffType,
             startsOn,
             endsOn,
-            hours: parseFloat(hours),
+            hours: totalHours,
             notes: notes.trim() || null,
             nannyJoinsVacation: isVacation ? nannyJoinsVacation : false,
             vacationDailyRateCents: vacationRateCents,
@@ -581,10 +610,14 @@ export function CalendarEventForm({
               <DatePicker value={endsOn} onChange={setEndsOn} min={startsOn || undefined} />
             </fieldset>
           </section>
-          <fieldset className="space-y-2">
-            <Label>{timeOffType === 'vacation' ? 'Hours (for records)' : 'Hours'}</Label>
-            <Input type="number" step="0.5" value={hours} onChange={(e) => setHours(e.target.value)} />
-          </fieldset>
+          <TimeOffHoursFields
+            startsOn={startsOn}
+            endsOn={endsOn}
+            hoursPerDay={hoursPerDay}
+            onHoursPerDayChange={setHoursPerDay}
+            holidayOverrides={holidays}
+            hoursLabel={timeOffType === 'vacation' ? 'Hours per day (for records)' : 'Hours per day'}
+          />
           {timeOffType === 'vacation' && (
             <fieldset className="space-y-3 rounded-md border p-3">
               <label className="flex cursor-pointer items-start gap-3">

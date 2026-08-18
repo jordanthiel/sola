@@ -35,6 +35,7 @@ import { mergeScheduleWithTemplates, isTemplateOccurrence } from '@/lib/schedule
 import type { NannyScheduleTemplate } from '@/types/schedule-template'
 import type { ScheduleBlock } from '@/types/database'
 import { calculatePayroll, getPayPeriodBounds } from '@/lib/payroll'
+import { platformPayrollStartDate } from '@/lib/advance-backfill'
 import {
   childAttendeesFromGroup,
   groupChildActivities,
@@ -87,26 +88,28 @@ export function NannyDashboard() {
 
   const weekMinutes = useMemo(() => {
     if (!weekBlocks || !myNanny) return 0
+    const trackingStart = platformPayrollStartDate(myNanny.start_date, myNanny.created_at)
     const shifts = payableShiftsInPeriod(
       weekBlocks,
       (templates ?? []) as NannyScheduleTemplate[],
       myNanny.id,
       weekStart,
       weekEnd,
-      myNanny.start_date,
+      trackingStart,
     )
     return shifts.reduce((s, sh) => s + payableShiftMinutes(sh), 0)
   }, [weekBlocks, templates, myNanny, weekStart, weekEnd])
 
   const periodPreview = useMemo(() => {
     if (!settings || !weekBlocks || !period || !myNanny) return null
+    const trackingStart = platformPayrollStartDate(myNanny.start_date, myNanny.created_at)
     const shifts = payableShiftsInPeriod(
       weekBlocks,
       (templates ?? []) as NannyScheduleTemplate[],
       myNanny.id,
       period.start,
       period.end,
-      myNanny.start_date,
+      trackingStart,
     )
     return calculatePayroll(
       shifts,
@@ -157,12 +160,9 @@ export function NannyDashboard() {
         }
       />
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <NannyAdvanceDashboardCard
-          householdNannyId={myNanny?.id}
-          className="md:col-span-2 lg:col-span-4"
-        />
+      <NannyAdvanceDashboardCard householdNannyId={myNanny?.id} />
 
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card className={cn('stat-card stat-card-highlight')}>
           <CardHeader className="pb-2">
             <CardDescription>This week</CardDescription>
